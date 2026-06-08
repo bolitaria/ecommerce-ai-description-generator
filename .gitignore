@@ -1,0 +1,39 @@
+# ── Environment & Secrets ──────────────────
+.env                    # your real keys – never commit
+.env.local
+.env.*.local
+
+# ── Build artifacts ────────────────────────
+coverage.out
+coverage.html
+test.log
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+ecommerce-ai-description-generator
+mockopenai
+toolkit
+
+# ── Data & Database ────────────────────────
+/data                   # SQLite database persisted by Docker volume
+
+# ── Frontend (React) ───────────────────────
+web/node_modules/
+web/dist/
+web/build/
+
+# ── IDE & OS ───────────────────────────────
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ── Docker volumes (if any) ────────────────
+*.db-journal
+*.db-wal
+*.db-shm

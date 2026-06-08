@@ -1,0 +1,28 @@
+services:
+  toolkit:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      - PORT=8080
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-fake}
+      - OPENAI_URL=${OPENAI_URL:-http://mock-openai:5000/v1}
+      - ENV=${ENV:-mock}
+    depends_on:
+      - mock-openai
+
+  mock-openai:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    ports:
+      - "5000:5000"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - toolkit
