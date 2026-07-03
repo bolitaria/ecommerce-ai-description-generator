@@ -6,53 +6,41 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/openai"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
 )
 
-type generateRequest struct {
-	ProductName string `json:"product_name"`
-	Features    string `json:"features"`
+type GenerateHandler struct {
+	aiSvc *service.AIService
 }
 
-type generateResponse struct {
-	Description string `json:"description"`
+func NewGenerateHandler(aiSvc *service.AIService) *GenerateHandler {
+	return &GenerateHandler{aiSvc: aiSvc}
 }
 
-// GenerateDescription returns an HTTP handler that uses the given AIClient
-// to generate product descriptions.
-func GenerateDescription(ai openai.AIClient) http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != http.MethodPost {
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-			return
-		}
-
-		var req generateRequest
-		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			http.Error(w, "Invalid JSON body", http.StatusBadRequest)
-			return
-		}
-
-		// Sanitize and validate inputs
-		req.ProductName = strings.TrimSpace(req.ProductName)
-		req.Features = strings.TrimSpace(req.Features)
-		if len(req.ProductName) == 0 || len(req.Features) == 0 {
-			http.Error(w, "product_name and features are required", http.StatusBadRequest)
-			return
-		}
-		if len(req.ProductName) > 200 || len(req.Features) > 1000 {
-			http.Error(w, "Input too long", http.StatusBadRequest)
-			return
-		}
-
-		desc, err := ai.GenerateDescription(r.Context(), req.ProductName, req.Features)
-		if err != nil {
-			log.Printf("AI generation error: %v", err)
-			http.Error(w, "Failed to generate description", http.StatusInternalServerError)
-			return
-		}
-
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(generateResponse{Description: desc})
+func (h *GenerateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		writeError(w, http.StatusMethodNotAllowed, "method not allowed")
+		return
 	}
+	var req struct {
+		ProductName string `json:"product_name"`
+		Features    string `json:"features"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	req.ProductName = strings.TrimSpace(req.ProductName)
+	req.Features = strings.TrimSpace(req.Features)
+	if req.ProductName == "" || req.Features == "" {
+		writeError(w, http.StatusBadRequest, "product_name and features required")
+		return
+	}
+	desc, err := h.aiSvc.GenerateDescription(r.Context(), req.ProductName, req.Features)
+	if err != nil {
+		log.Printf("AI generation error: %v", err)   // <-- AÑADIDO
+		writeError(w, http.StatusInternalServerError, "generation failed")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]string{"description": desc})
 }

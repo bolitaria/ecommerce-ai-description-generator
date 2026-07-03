@@ -1,35 +1,36 @@
-import { useState } from 'react';
-import './App.css';
-import Dashboard from './components/Dashboard';
-import Products from './components/Products';
-import AITools from './components/AITools';
-import Orders from './components/Orders';
-import Settings from './components/Settings';
+import React, { useState, lazy, Suspense } from 'react'
+import './App.css'
+
+const Dashboard = lazy(() => import('./components/Dashboard'))
+const Products = lazy(() => import('./components/Products'))
+const AITools = lazy(() => import('./components/AITools'))
+const Orders = lazy(() => import('./components/Orders'))
+const Settings = lazy(() => import('./components/Settings'))
 
 function App() {
-  const [activeView, setActiveView] = useState('dashboard');
+  const [activeView, setActiveView] = useState('dashboard')
 
   const renderView = () => {
-    switch (activeView) {
-      case 'dashboard': return <Dashboard />;
-      case 'products': return <Products />;
-      case 'ai-tools': return <AITools />;
-      case 'orders': return <Orders />;
-      case 'settings': return <Settings />;
-      default: return <Dashboard />;
+    const views: Record<string, React.JSX.Element> = {
+      dashboard: <Dashboard />,
+      products: <Products />,
+      'ai-tools': <AITools />,
+      orders: <Orders />,
+      settings: <Settings />,
     }
-  };
+    return views[activeView] || <Dashboard />
+  }
 
   return (
     <div className="app-layout">
       <aside className="sidebar">
         <div className="sidebar-brand">Store Manager</div>
         <nav className="sidebar-nav">
-          <a href="#" className={activeView === 'dashboard' ? 'active' : ''} onClick={() => setActiveView('dashboard')}>Dashboard</a>
-          <a href="#" className={activeView === 'products' ? 'active' : ''} onClick={() => setActiveView('products')}>Products</a>
-          <a href="#" className={activeView === 'ai-tools' ? 'active' : ''} onClick={() => setActiveView('ai-tools')}>AI Tools</a>
-          <a href="#" className={activeView === 'orders' ? 'active' : ''} onClick={() => setActiveView('orders')}>Orders</a>
-          <a href="#" className={activeView === 'settings' ? 'active' : ''} onClick={() => setActiveView('settings')}>Settings</a>
+          {['dashboard', 'products', 'ai-tools', 'orders', 'settings'].map(v => (
+            <a key={v} href="#" className={activeView === v ? 'active' : ''} onClick={() => setActiveView(v)}>
+              {v.charAt(0).toUpperCase() + v.slice(1).replace('-', ' ')}
+            </a>
+          ))}
         </nav>
       </aside>
       <div className="main-area">
@@ -38,11 +39,13 @@ function App() {
           <div className="user-menu">My Store</div>
         </header>
         <main className="content">
-          {renderView()}
+          <Suspense fallback={<div>Loading...</div>}>
+            {renderView()}
+          </Suspense>
         </main>
       </div>
     </div>
-  );
+  )
 }
 
-export default App;
+export default App

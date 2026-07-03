@@ -1,22 +1,30 @@
 services:
-  toolkit:
+  backend:
     build: .
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
+      - DATABASE_URL=postgres://user:pass@postgres:5432/store?sslmode=disable
       - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-fake}
-      - OPENAI_URL=${OPENAI_URL:-http://mock-openai:5000/v1}
-      - ENV=${ENV:-mock}
+      - OPENAI_URL=http://mock-openai:5000/v1
+      - ENV=mock
+      - JWT_SECRET=dev-secret
+      - REDIS_URL=redis://redis:6379
     depends_on:
-      - mock-openai
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      mock-openai:
+        condition: service_started
 
   mock-openai:
     build:
       context: .
       dockerfile: Dockerfile.mock
     ports:
-      - "5000:5000"
+      - "5001:5000"
 
   frontend:
     build:
@@ -25,4 +33,27 @@ services:
     ports:
       - "5173:80"
     depends_on:
-      - toolkit
+      - backend
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: pass
+      POSTGRES_DB: store
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d store"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    volumes:
+      - redisdata:/data
+
+volumes:
+  pgdata:
+  redisdata:

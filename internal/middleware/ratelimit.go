@@ -3,11 +3,9 @@ package middleware
 import (
 	"net/http"
 	"sync"
-
 	"golang.org/x/time/rate"
 )
 
-// RateLimitPerIP returns a middleware that limits the number of requests per second per IP.
 func RateLimitPerIP(rps float64) func(http.Handler) http.Handler {
 	var mu sync.Mutex
 	visitors := make(map[string]*rate.Limiter)
@@ -26,8 +24,7 @@ func RateLimitPerIP(rps float64) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			ip := r.RemoteAddr
-			limiter := getLimiter(ip)
-			if !limiter.Allow() {
+			if !getLimiter(ip).Allow() {
 				http.Error(w, "Rate limit exceeded", http.StatusTooManyRequests)
 				return
 			}

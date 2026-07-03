@@ -1,29 +1,42 @@
 services:
   backend:
-    image: ghcr.io/your-username/ecommerce-ai-description-generator/backend:latest
+    image: ghcr.io/your-org/backend:latest
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
+      - DATABASE_URL=${DATABASE_URL}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - OPENAI_URL=${OPENAI_URL}
-      - OPENAI_MODEL=${OPENAI_MODEL:-gpt-3.5-turbo}
+      - OPENAI_MODEL=${OPENAI_MODEL}
       - ENV=production
-      - DB_PATH=/app/data/store.db
-    volumes:
-      - prod-data:/app/data
+      - JWT_SECRET=${JWT_SECRET}
+      - REDIS_URL=redis://redis:6379
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:8080/health"]
       interval: 30s
       timeout: 5s
       retries: 3
+    depends_on:
+      - postgres
+      - redis
 
   frontend:
-    image: ghcr.io/your-username/ecommerce-ai-description-generator/frontend:latest
+    image: ghcr.io/your-org/frontend:latest
     ports:
-      - "5173:80"
-    depends_on:
-      - backend
+      - "80:80"
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: store
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7-alpine
 
 volumes:
-  prod-data:
+  pgdata:
