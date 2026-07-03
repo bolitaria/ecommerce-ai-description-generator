@@ -1,8 +1,4 @@
 run:
-  skip-dirs:
-    - web
-    - deploy
-    - scripts
   timeout: 3m
 linters:
   enable:
@@ -12,3 +8,8 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+issues:
+  exclude-dirs:
+    - web
+    - deploy
+    - scripts

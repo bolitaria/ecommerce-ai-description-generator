@@ -9,11 +9,11 @@ import (
 
 func TestInterfaceCompliance(t *testing.T) {
 	// Ensure NewClient returns an AIClient interface
-	var _ openai.AIClient = openai.NewClient("sk-test", "http://example.com")
+	var _ openai.AIClient = openai.NewClient("sk-test", "http://example.com", "test-model")
 }
 
 func TestGenerateDescriptionErrorOnBadURL(t *testing.T) {
-	client := openai.NewClient("sk-test", "http://localhost:1/nonexistent")
+	client := openai.NewClient("sk-test", "http://localhost:1/nonexistent", "test-model")
 	_, err := client.GenerateDescription(context.Background(), "test", "test")
 	if err == nil {
 		t.Error("expected error for bad URL")

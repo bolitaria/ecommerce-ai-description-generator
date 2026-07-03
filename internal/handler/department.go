@@ -1,31 +1,23 @@
 package handler
 
 import (
-	"encoding/json"
 	"net/http"
-
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/db"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
 )
 
-func GetDepartments() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		rows, err := db.DB.Query("SELECT id, name FROM departments ORDER BY name")
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		defer rows.Close()
+type DepartmentHandler struct {
+	repo domain.DepartmentRepository
+}
 
-		var deps []db.Department
-		for rows.Next() {
-			var d db.Department
-			if err := rows.Scan(&d.ID, &d.Name); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			deps = append(deps, d)
-		}
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(deps)
+func NewDepartmentHandler(repo domain.DepartmentRepository) *DepartmentHandler {
+	return &DepartmentHandler{repo: repo}
+}
+
+func (h *DepartmentHandler) List(w http.ResponseWriter, r *http.Request) {
+	deps, err := h.repo.ListAll()
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
 	}
+	writeJSON(w, http.StatusOK, map[string]interface{}{"departments": deps})
 }

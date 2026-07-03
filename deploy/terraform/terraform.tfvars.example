@@ -1,0 +1,6 @@
+project_id     = "my-gcp-project"
+region         = "us-central1"
+service_name   = "ecommerce-backend"
+backend_image  = "ghcr.io/your-org/backend:latest"
+database_url   = "postgres://user:pass@host/db"
+jwt_secret     = "change-me"

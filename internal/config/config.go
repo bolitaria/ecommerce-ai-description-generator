@@ -11,6 +11,9 @@ type Config struct {
 	RateLimit   float64
 	Environment string
 	DBPath      string
+	DatabaseURL string
+	JWTSecret   string
+	RedisURL    string
 }
 
 func Load() *Config {
@@ -23,6 +26,9 @@ func Load() *Config {
 		RateLimit:   5.0,
 		Environment: getEnv("ENV", "development"),
 		DBPath:      getEnv("DB_PATH", "./data/store.db"),
+		DatabaseURL: getEnv("DATABASE_URL", "postgres://user:pass@localhost:5432/store?sslmode=disable"),
+		JWTSecret:   getEnv("JWT_SECRET", "dev-secret-change-me"),
+		RedisURL:    getEnv("REDIS_URL", "redis://localhost:6379"),
 	}
 }
 

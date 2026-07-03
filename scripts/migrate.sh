@@ -1,7 +1,12 @@
 #!/bin/bash
-set -euo pipefail
-echo "Running database migrations..."
-cd "$(dirname "$0")/.."
-# Currently migrations run inside InitDB.
-# Add go run ./cmd/migrate/main.go here when needed.
-echo "Migrations applied."
+# Usage: ./scripts/migrate.sh [up|down]
+DIRECTION=${1:-up}
+if [ "$DIRECTION" = "up" ]; then
+  echo "Applying migrations..."
+  go run cmd/migrate/main.go up
+elif [ "$DIRECTION" = "down" ]; then
+  echo "Rolling back migrations..."
+  go run cmd/migrate/main.go down
+else
+  echo "Unknown direction: $DIRECTION"
+fi

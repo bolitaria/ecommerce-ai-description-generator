@@ -6,163 +6,90 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/db"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
 )
 
-func ProductsHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		switch r.Method {
-		case http.MethodGet:
-			getProducts(w, r)
-		case http.MethodPost:
-			createProduct(w, r)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	}
+type ProductHandler struct {
+	svc *service.ProductService
 }
 
-func ProductByIDHandler() http.HandlerFunc {
-	return func(w http.ResponseWriter, r *http.Request) {
-		id, err := parseID(r.URL.Path, "/api/products/")
-		if err != nil {
-			http.Error(w, "invalid id", http.StatusBadRequest)
+func NewProductHandler(svc *service.ProductService) *ProductHandler {
+	return &ProductHandler{svc: svc}
+}
+
+func (h *ProductHandler) List(w http.ResponseWriter, r *http.Request) {
+	q := r.URL.Query()
+	filter := domain.ProductFilter{}
+	if depID := q.Get("department_id"); depID != "" {
+		id, err := strconv.Atoi(depID)
+		if err == nil {
+			filter.DepartmentID = &id
+		}
+	}
+	filter.Search = q.Get("search")
+	page, _ := strconv.Atoi(q.Get("page"))
+	limit, _ := strconv.Atoi(q.Get("limit"))
+
+	products, total, err := h.svc.List(filter, page, limit)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
+		return
+	}
+
+	writeJSON(w, http.StatusOK, map[string]interface{}{
+		"data":  products,
+		"total": total,
+		"page":  page,
+		"limit": limit,
+	})
+}
+
+func (h *ProductHandler) Create(w http.ResponseWriter, r *http.Request) {
+	var p domain.Product
+	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid JSON")
+		return
+	}
+	id, err := h.svc.Create(p)
+	if err != nil {
+		if _, ok := err.(*domain.ValidationError); ok {
+			writeError(w, http.StatusBadRequest, err.Error())
 			return
 		}
-		switch r.Method {
-		case http.MethodPut:
-			updateProduct(w, r, id)
-		case http.MethodDelete:
-			deleteProduct(w, r, id)
-		default:
-			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		}
-	}
-}
-
-func getProducts(w http.ResponseWriter, r *http.Request) {
-	query := `SELECT p.id, p.name, p.features, p.description, p.department_id,
-	          p.created_at, p.updated_at, d.name as department_name
-	          FROM products p JOIN departments d ON p.department_id = d.id WHERE 1=1`
-
-	countQuery := `SELECT COUNT(*) FROM products p JOIN departments d ON p.department_id = d.id WHERE 1=1`
-
-	departmentID := r.URL.Query().Get("department_id")
-	search := r.URL.Query().Get("search")
-
-	var args []interface{}
-	if departmentID != "" {
-		filter := " AND p.department_id = ?"
-		query += filter
-		countQuery += filter
-		id, _ := strconv.Atoi(departmentID)
-		args = append(args, id)
-	}
-	if search != "" {
-		filter := " AND p.name LIKE ?"
-		query += filter
-		countQuery += filter
-		args = append(args, "%"+search+"%")
-	}
-
-	var total int
-	err := db.DB.QueryRow(countQuery, args...).Scan(&total)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
-
-	page, _ := strconv.Atoi(r.URL.Query().Get("page"))
-	if page < 1 {
-		page = 1
-	}
-	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
-	if limit < 1 || limit > 100 {
-		limit = 10
-	}
-	offset := (page - 1) * limit
-
-	query += " ORDER BY p.updated_at DESC LIMIT ? OFFSET ?"
-	args = append(args, limit, offset)
-
-	rows, err := db.DB.Query(query, args...)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	defer rows.Close()
-
-	var products []map[string]interface{}
-	for rows.Next() {
-		var id, depID int
-		var name, features, description, depName string
-		var createdAt, updatedAt string
-		if err := rows.Scan(&id, &name, &features, &description, &depID, &createdAt, &updatedAt, &depName); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		products = append(products, map[string]interface{}{
-			"id":              id,
-			"name":            name,
-			"features":        features,
-			"description":     description,
-			"department_id":   depID,
-			"department_name": depName,
-			"created_at":      createdAt,
-			"updated_at":      updatedAt,
-		})
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("X-Total-Count", strconv.Itoa(total))
-	json.NewEncoder(w).Encode(products)
+	writeJSON(w, http.StatusCreated, map[string]interface{}{"id": id})
 }
 
-func createProduct(w http.ResponseWriter, r *http.Request) {
-	var p struct {
-		Name         string `json:"name"`
-		Features     string `json:"features"`
-		DepartmentID int    `json:"department_id"`
+func (h *ProductHandler) Update(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r.URL.Path, "/api/v1/products/")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
 	}
+	var p domain.Product
 	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		writeError(w, http.StatusBadRequest, "invalid JSON")
 		return
 	}
-	res, err := db.DB.Exec("INSERT INTO products (name, features, department_id) VALUES (?, ?, ?)",
-		p.Name, p.Features, p.DepartmentID)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-	id, _ := res.LastInsertId()
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{"id": id})
-}
-
-func updateProduct(w http.ResponseWriter, r *http.Request, id int) {
-	var p struct {
-		Name         string `json:"name"`
-		Features     string `json:"features"`
-		Description  string `json:"description"`
-		DepartmentID int    `json:"department_id"`
-	}
-	if err := json.NewDecoder(r.Body).Decode(&p); err != nil {
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
-		return
-	}
-	_, err := db.DB.Exec(`UPDATE products SET name=?, features=?, description=?, department_id=?, updated_at=CURRENT_TIMESTAMP WHERE id=?`,
-		p.Name, p.Features, p.Description, p.DepartmentID, id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+	p.ID = id
+	if err := h.svc.Update(p); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusOK)
 }
 
-func deleteProduct(w http.ResponseWriter, r *http.Request, id int) {
-	_, err := db.DB.Exec("DELETE FROM products WHERE id=?", id)
+func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r.URL.Path, "/api/v1/products/")
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		writeError(w, http.StatusBadRequest, "invalid id")
+		return
+	}
+	if err := h.svc.Delete(id); err != nil {
+		writeError(w, http.StatusInternalServerError, err.Error())
 		return
 	}
 	w.WriteHeader(http.StatusOK)
@@ -171,4 +98,14 @@ func deleteProduct(w http.ResponseWriter, r *http.Request, id int) {
 func parseID(path, prefix string) (int, error) {
 	idStr := strings.TrimPrefix(path, prefix)
 	return strconv.Atoi(idStr)
+}
+
+func writeJSON(w http.ResponseWriter, status int, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	json.NewEncoder(w).Encode(data)
+}
+
+func writeError(w http.ResponseWriter, status int, msg string) {
+	writeJSON(w, status, map[string]string{"error": msg})
 }
