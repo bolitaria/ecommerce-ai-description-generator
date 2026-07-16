@@ -2,6 +2,6 @@ graph TB
   subgraph "E-commerce AI System"
     Web["React Frontend"] -->|HTTP| API["Go API Server"]
     API -->|SQL| DB[(PostgreSQL)]
-    API -->|REST| AI["OpenAI Compatible"]
+    API -->|REST| AI["DeepSeek Compatible"]
     API -->|Pub/Sub| Redis["Redis Cache"]
   end

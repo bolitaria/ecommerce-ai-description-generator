@@ -75,5 +75,5 @@ jobs:
           credentials: ${{ secrets.GCP_SA_KEY }}
           env_vars: |
             DATABASE_URL=${{ secrets.DATABASE_URL }}
-            OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+            DeepSeek_API_KEY=${{ secrets.DeepSeek_API_KEY }}
             JWT_SECRET=${{ secrets.JWT_SECRET }}

@@ -10,4 +10,4 @@ gcloud run deploy "$SERVICE_NAME" \
   --region "$REGION" \
   --allow-unauthenticated \
   --set-env-vars "DATABASE_URL=$DATABASE_URL,JWT_SECRET=$JWT_SECRET,ENV=production" \
-  --set-secrets "OPENAI_API_KEY=openai-api-key:latest"
+  --set-secrets "DeepSeek_API_KEY=deepseek-api-key:latest"

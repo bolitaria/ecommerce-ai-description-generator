@@ -9,8 +9,8 @@ import (
 )
 
 func main() {
-	if os.Getenv("OPENAI_API_KEY") == "" && os.Getenv("ENV") != "mock" {
-		log.Fatal("OPENAI_API_KEY environment variable is required")
+	if os.Getenv("DeepSeek_API_KEY") == "" && os.Getenv("ENV") != "mock" {
+		log.Fatal("DeepSeek_API_KEY environment variable is required")
 	}
 	cfg := config.Load()
 	server.Run(cfg)

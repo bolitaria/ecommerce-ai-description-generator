@@ -1,5 +1,5 @@
 # ── Environment & Secrets ──────────────────
-.env                    # your real keys – never commit
+.env                  
 .env.local
 .env.*.local
 
@@ -13,7 +13,7 @@ test.log
 *.so
 *.dylib
 ecommerce-ai-description-generator
-mockopenai
+mockdeepseek
 toolkit
 
 # ── Data & Database ────────────────────────

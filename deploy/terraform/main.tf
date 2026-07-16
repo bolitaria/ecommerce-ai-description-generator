@@ -12,8 +12,8 @@ provider "google" {
   region  = var.region
 }
 
-resource "google_secret_manager_secret" "openai_key" {
-  secret_id = "openai-api-key"
+resource "google_secret_manager_secret" "deepseek_key" {
+  secret_id = "deepseek-api-key"
   replication {
     auto {}
   }
@@ -31,10 +31,10 @@ resource "google_cloud_run_v2_service" "backend" {
         value = var.database_url
       }
       env {
-        name = "OPENAI_API_KEY"
+        name = "DeepSeek_API_KEY"
         value_source {
           secret_key_ref {
-            secret  = google_secret_manager_secret.openai_key.secret_id
+            secret  = google_secret_manager_secret.deepseek_key.secret_id
             version = "latest"
           }
         }

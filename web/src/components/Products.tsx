@@ -1,18 +1,21 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
 import toast from 'react-hot-toast'
+import SkeletonCard from './SkeletonCard'
 import './Products.css'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
-// Schemas
 const productSchema = z.object({
   name: z.string().min(1, 'Name is required'),
   features: z.string().min(1, 'Features required'),
   department_id: z.number().int().positive(),
+  image_url: z.string().url().optional().or(z.literal('')),
+  price: z.number().min(0).default(0),
 })
 
 type ProductForm = z.infer<typeof productSchema>
@@ -23,7 +26,8 @@ interface Product {
   features: string
   description: string
   department_id: number
-  department_name?: string
+  image_url?: string
+  price: number
 }
 
 interface Department {
@@ -34,37 +38,45 @@ interface Department {
 const fetchDepartments = () =>
   fetch(`${API_URL}/api/v1/departments`).then(res => res.json().then(data => data.departments || []))
 
-const fetchProducts = ({ page, limit, search, departmentId }: any) => {
-  const params = new URLSearchParams()
-  if (search) params.append('search', search)
-  if (departmentId) params.append('department_id', departmentId)
-  params.append('page', String(page))
-  params.append('limit', String(limit))
-  return fetch(`${API_URL}/api/v1/products?${params}`).then(res => res.json())
-}
+const fetchProducts = (params: URLSearchParams) =>
+  fetch(`${API_URL}/api/v1/products?${params}`).then(res => res.json())
 
 export default function Products() {
   const queryClient = useQueryClient()
-  const [page, setPage] = useState(1)
-  const [search, setSearch] = useState('')
-  const [departmentFilter, setDepartmentFilter] = useState('')
+  const [searchParams, setSearchParams] = useSearchParams()
+  const page = parseInt(searchParams.get('page') || '1', 10)
+  const search = searchParams.get('search') || ''
+  const departmentId = searchParams.get('department_id') || ''
+
   const [translateProduct, setTranslateProduct] = useState<Product | null>(null)
   const [translatedText, setTranslatedText] = useState('')
   const [emailModal, setEmailModal] = useState<{ subject: string; body: string } | null>(null)
+  const [previewProduct, setPreviewProduct] = useState<Product | null>(null)
+  const [editingId, setEditingId] = useState<number | null>(null)
+
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [excelFile, setExcelFile] = useState<File | null>(null)
+  const [excelPreview, setExcelPreview] = useState<Product[] | null>(null)
 
   const { data: departments = [] } = useQuery<Department[]>({
     queryKey: ['departments'],
     queryFn: fetchDepartments,
   })
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['products', page, search, departmentFilter],
-    queryFn: () => fetchProducts({ page, limit: 6, search, departmentId: departmentFilter }),
+  const queryParams = new URLSearchParams()
+  if (search) queryParams.set('search', search)
+  if (departmentId) queryParams.set('department_id', departmentId)
+  queryParams.set('page', String(page))
+  queryParams.set('limit', '6')
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['products', page, search, departmentId],
+    queryFn: () => fetchProducts(queryParams),
   })
 
   const { register, handleSubmit, reset, formState: { errors } } = useForm<ProductForm>({
     resolver: zodResolver(productSchema),
-    defaultValues: { department_id: 1 },
+    defaultValues: { department_id: 1, image_url: '', price: 0 },
   })
 
   const addMutation = useMutation({
@@ -77,9 +89,24 @@ export default function Products() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['products'] })
       reset()
-      toast.success('Product added')
+      toast.success('Producto añadido')
     },
-    onError: () => toast.error('Failed to add product'),
+    onError: () => toast.error('Error al añadir producto'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: (product: Product) =>
+      fetch(`${API_URL}/api/v1/products/${product.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(product),
+      }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setEditingId(null)
+      toast.success('Producto actualizado')
+    },
+    onError: () => toast.error('Error al actualizar'),
   })
 
   const generateMutation = useMutation({
@@ -90,15 +117,10 @@ export default function Products() {
         body: JSON.stringify({ product_name: product.name, features: product.features }),
       }).then(res => res.json()),
     onSuccess: (data, product) => {
-      fetch(`${API_URL}/api/v1/products/${product.id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...product, description: data.description }),
-      })
-      queryClient.invalidateQueries({ queryKey: ['products'] })
-      toast.success('Description generated')
+      updateMutation.mutate({ ...product, description: data.description })
+      toast.success('Descripción generada')
     },
-    onError: () => toast.error('Generation failed'),
+    onError: () => toast.error('Fallo en generación'),
   })
 
   const translateMutation = useMutation({
@@ -109,7 +131,7 @@ export default function Products() {
         body: JSON.stringify({ text, target_lang: lang }),
       }).then(res => res.json()),
     onSuccess: (data) => setTranslatedText(data.translated),
-    onError: () => toast.error('Translation failed'),
+    onError: () => toast.error('Fallo en traducción'),
   })
 
   const emailMutation = useMutation({
@@ -120,8 +142,90 @@ export default function Products() {
         body: JSON.stringify({ product_name: product.name, features: product.features }),
       }).then(res => res.json()),
     onSuccess: (data) => setEmailModal(data),
-    onError: () => toast.error('Email generation failed'),
+    onError: () => toast.error('Fallo en generación de email'),
   })
+
+  const previewExcelMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return fetch(`${API_URL}/api/v1/products/import/preview`, {
+        method: 'POST',
+        body: formData,
+      }).then(res => res.json())
+    },
+    onSuccess: (data) => setExcelPreview(data.preview || []),
+    onError: () => toast.error('Error al leer Excel'),
+  })
+
+  const importMutation = useMutation({
+    mutationFn: (file: File) => {
+      const formData = new FormData()
+      formData.append('file', file)
+      return fetch(`${API_URL}/api/v1/products/import`, {
+        method: 'POST',
+        body: formData,
+      }).then(res => res.json())
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      setExcelPreview(null)
+      setExcelFile(null)
+      toast.success(`${data.created} productos importados`)
+      if (data.errors > 0) toast.error(`${data.errors} filas fallaron`)
+    },
+    onError: () => toast.error('Fallo en importación'),
+  })
+
+  const generateAllMissing = useMutation({
+    mutationFn: async () => {
+      const products = data?.data || []
+      const withoutDesc = products.filter((p: Product) => !p.description)
+      for (const p of withoutDesc) {
+        const res = await fetch(`${API_URL}/api/v1/generate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ product_name: p.name, features: p.features }),
+        })
+        const result = await res.json()
+        if (result.description) {
+          await fetch(`${API_URL}/api/v1/products/${p.id}`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ ...p, description: result.description }),
+          })
+        }
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['products'] })
+      toast.success('Descripciones generadas')
+    },
+    onError: () => toast.error('Fallo en la generación por lotes'),
+  })
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (file) {
+      setExcelFile(file)
+      previewExcelMutation.mutate(file)
+    }
+  }
+
+  const confirmImport = () => {
+    if (excelFile) importMutation.mutate(excelFile)
+  }
+
+  const updateFilter = (key: string, value: string) => {
+    const params = new URLSearchParams(searchParams)
+    if (value) {
+      params.set(key, value)
+    } else {
+      params.delete(key)
+    }
+    params.set('page', '1')
+    setSearchParams(params)
+  }
 
   const products: Product[] = data?.data || []
   const totalPages = Math.ceil((data?.total || 0) / 6)
@@ -129,87 +233,234 @@ export default function Products() {
   return (
     <div className="products-container">
       <div className="add-product-section">
-        <h3>Add New Product</h3>
+        <h3>Añadir nuevo producto</h3>
         <form className="add-product-form" onSubmit={handleSubmit(data => addMutation.mutate(data))}>
-          <input {...register('name')} placeholder="Product name" />
-          {errors.name && <span className="error">{errors.name.message}</span>}
-          <input {...register('features')} placeholder="Key features" />
-          {errors.features && <span className="error">{errors.features.message}</span>}
-          <select {...register('department_id', { valueAsNumber: true })}>
-            {departments.map((d: Department) => <option key={d.id} value={d.id}>{d.name}</option>)}
-          </select>
-          <button type="submit" className="add-btn" disabled={addMutation.isPending}>Add</button>
+          <div className="input-group">
+            <input {...register('name')} placeholder=" " id="name" />
+            <label htmlFor="name">Nombre del producto</label>
+            {errors.name && <span className="error">{errors.name.message}</span>}
+          </div>
+          <div className="input-group">
+            <input {...register('features')} placeholder=" " id="features" />
+            <label htmlFor="features">Características clave</label>
+            {errors.features && <span className="error">{errors.features.message}</span>}
+          </div>
+          <div className="input-group">
+            <input {...register('image_url')} placeholder=" " id="image_url" />
+            <label htmlFor="image_url">URL de imagen (opcional)</label>
+          </div>
+          <div className="input-group">
+            <input type="number" step="0.01" {...register('price', { valueAsNumber: true })} placeholder=" " id="price" />
+            <label htmlFor="price">Precio</label>
+          </div>
+          <div className="input-group">
+            <select {...register('department_id', { valueAsNumber: true })} id="department">
+              {departments.map((d: Department) => <option key={d.id} value={d.id}>{d.name}</option>)}
+            </select>
+            <label htmlFor="department">Departamento</label>
+          </div>
+          <button type="submit" className="btn-primary" disabled={addMutation.isPending}>
+            Añadir producto
+          </button>
+          <small className="hint">Si no escribes descripción, la IA la generará automáticamente.</small>
         </form>
       </div>
 
       <div className="filters">
-        <select value={departmentFilter} onChange={e => setDepartmentFilter(e.target.value)}>
-          <option value="">All Departments</option>
+        <select value={departmentId} onChange={e => updateFilter('department_id', e.target.value)}>
+          <option value="">Todos los departamentos</option>
           {departments.map((d: Department) => <option key={d.id} value={d.id}>{d.name}</option>)}
         </select>
-        <input placeholder="Search..." value={search} onChange={e => setSearch(e.target.value)} />
+        <input
+          placeholder="Buscar..."
+          value={search}
+          onChange={e => updateFilter('search', e.target.value)}
+        />
       </div>
 
-      {isLoading && <div>Loading...</div>}
-      {error && <div className="error-banner">Failed to load products</div>}
-
-      <div className="product-grid">
-        {products.map(product => (
-          <div key={product.id} className="product-card">
-            <div className="product-img-placeholder"><span>{product.department_name}</span></div>
-            <div className="product-info">
-              <h4>{product.name}</h4>
-              <p className="features">{product.features}</p>
-              <p className="description">{product.description || <i>No description</i>}</p>
-              <div className="card-actions">
-                <button className="btn-generate" onClick={() => generateMutation.mutate(product)} disabled={generateMutation.isPending}>
-                  {generateMutation.isPending ? '...' : 'Generate'}
-                </button>
-                <button className="btn-translate" onClick={() => setTranslateProduct(product)} disabled={!product.description}>
-                  Translate
-                </button>
-                <button className="btn-email" onClick={() => emailMutation.mutate(product)}>
-                  Email
-                </button>
-              </div>
-            </div>
-          </div>
-        ))}
+      <div className="import-section">
+        <input
+          type="file"
+          accept=".xlsx"
+          ref={fileInputRef}
+          style={{ display: 'none' }}
+          onChange={handleFileChange}
+        />
+        <button onClick={() => fileInputRef.current?.click()} className="btn-primary">
+          📥 Importar Excel
+        </button>
+        <a href={`${API_URL}/api/v1/products/import/template`} className="template-link" download>
+          📄 Descargar plantilla
+        </a>
+        <button
+          className="btn-generate"
+          onClick={() => generateAllMissing.mutate()}
+          disabled={generateAllMissing.isPending}
+        >
+          {generateAllMissing.isPending ? 'Generando...' : '🚀 Generar todas las descripciones'}
+        </button>
       </div>
 
-      <div className="pagination">
-        <button disabled={page <= 1} onClick={() => setPage(p => p - 1)}>Previous</button>
-        <span>Page {page} of {totalPages}</span>
-        <button disabled={page >= totalPages} onClick={() => setPage(p => p + 1)}>Next</button>
-      </div>
-
-      {translateProduct && (
-        <div className="modal-overlay" onClick={() => setTranslateProduct(null)}>
-          <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>Translate Description</h3>
-            <p><strong>{translateProduct.name}:</strong> {translateProduct.description}</p>
-            <select defaultValue="" onChange={e => translateMutation.mutate({ text: translateProduct.description, lang: e.target.value })}>
-              <option value="" disabled>Select language</option>
-              <option value="Spanish">Spanish</option>
-              <option value="French">French</option>
-              <option value="German">German</option>
-            </select>
-            {translatedText && <div className="result-box">{translatedText}</div>}
-            <button onClick={() => setTranslateProduct(null)}>Close</button>
+      {excelPreview && (
+        <div className="excel-preview">
+          <h4>Previsualización ({excelPreview.length} filas mostradas)</h4>
+          <table>
+            <thead>
+              <tr>
+                <th>Nombre</th><th>Características</th><th>Dept. ID</th><th>Imagen</th><th>Precio</th>
+              </tr>
+            </thead>
+            <tbody>
+              {excelPreview.map((p, idx) => (
+                <tr key={idx}>
+                  <td>{p.name}</td><td>{p.features}</td><td>{p.department_id}</td><td>{p.image_url?.slice(0, 30) || '-'}</td><td>{p.price.toFixed(2)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <div className="preview-actions">
+            <button onClick={confirmImport} disabled={importMutation.isPending}>
+              {importMutation.isPending ? 'Importando...' : '✅ Confirmar importación'}
+            </button>
+            <button onClick={() => { setExcelPreview(null); setExcelFile(null) }}>Cancelar</button>
           </div>
         </div>
       )}
 
+      {isLoading ? (
+        <div className="product-grid">
+          {Array.from({ length: 6 }).map((_, i) => <SkeletonCard key={i} />)}
+        </div>
+      ) : (
+        <div className="product-grid">
+          {products.map(product => (
+            <div key={product.id} className="product-card">
+              <div className="product-img-placeholder">
+                {product.image_url ? (
+                  <img src={product.image_url} alt={product.name} />
+                ) : (
+                  <span>{product.name.charAt(0).toUpperCase()}</span>
+                )}
+              </div>
+              <div className="product-info">
+                {editingId === product.id ? (
+                  <EditProductForm
+                    product={product}
+                    departments={departments}
+                    onSave={(updated) => updateMutation.mutate(updated)}
+                    onCancel={() => setEditingId(null)}
+                  />
+                ) : (
+                  <>
+                    <h4>{product.name}</h4>
+                    <p className="features">{product.features}</p>
+                    <p className="description">{product.description || <em>Sin descripción</em>}</p>
+                    <p className="price">${product.price.toFixed(2)}</p>
+                    <div className="card-actions">
+                      <button className="btn-generate" onClick={() => generateMutation.mutate(product)}>Generar</button>
+                      <button className="btn-translate" onClick={() => setTranslateProduct(product)} disabled={!product.description}>Traducir</button>
+                      <button className="btn-email" onClick={() => emailMutation.mutate(product)}>Email</button>
+                      <button className="btn-preview" onClick={() => setPreviewProduct(product)}>Vista previa</button>
+                      <button className="btn-edit" onClick={() => setEditingId(product.id)}>Editar</button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="pagination">
+        <button disabled={page <= 1} onClick={() => setSearchParams(prev => { prev.set('page', String(page - 1)); return prev })}>Anterior</button>
+        <span>Página {page} de {totalPages || 1}</span>
+        <button disabled={page >= totalPages} onClick={() => setSearchParams(prev => { prev.set('page', String(page + 1)); return prev })}>Siguiente</button>
+      </div>
+
+      {/* Modal de traducción – idiomas fijos, incluido English */}
+      {translateProduct && (
+        <div className="modal-overlay" onClick={() => setTranslateProduct(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h3>Traducir descripción</h3>
+            <p><strong>{translateProduct.name}:</strong> {translateProduct.description}</p>
+            <select
+              defaultValue=""
+              onChange={e => translateMutation.mutate({ text: translateProduct.description, lang: e.target.value })}
+            >
+              <option value="" disabled>Seleccionar idioma</option>
+              <option value="English">English</option>
+              <option value="Spanish">Español</option>
+              <option value="French">Francés</option>
+              <option value="German">Alemán</option>
+            </select>
+            {translatedText && <div className="result-box">{translatedText}</div>}
+            <button onClick={() => { setTranslateProduct(null); setTranslatedText(''); }}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de email */}
       {emailModal && (
         <div className="modal-overlay" onClick={() => setEmailModal(null)}>
           <div className="modal" onClick={e => e.stopPropagation()}>
-            <h3>Marketing Email</h3>
-            <p><strong>Subject:</strong> {emailModal.subject}</p>
-            <p><strong>Body:</strong> {emailModal.body}</p>
-            <button onClick={() => setEmailModal(null)}>Close</button>
+            <h3>Email de marketing</h3>
+            <p><strong>Asunto:</strong> {emailModal.subject}</p>
+            <p><strong>Cuerpo:</strong> {emailModal.body}</p>
+            <button onClick={() => setEmailModal(null)}>Cerrar</button>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de vista previa */}
+      {previewProduct && (
+        <div className="modal-overlay" onClick={() => setPreviewProduct(null)}>
+          <div className="modal" onClick={e => e.stopPropagation()}>
+            <h2>{previewProduct.name}</h2>
+            {previewProduct.image_url && <img src={previewProduct.image_url} alt={previewProduct.name} style={{ maxWidth: '100%', borderRadius: '8px', marginBottom: '1rem' }} />}
+            <p><strong>Características:</strong> {previewProduct.features}</p>
+            <p><strong>Descripción:</strong> {previewProduct.description || 'Sin descripción'}</p>
+            <p><strong>Precio:</strong> ${previewProduct.price.toFixed(2)}</p>
+            <p><strong>Departamento ID:</strong> {previewProduct.department_id}</p>
+            <button onClick={() => setPreviewProduct(null)} style={{ marginTop: '1rem' }}>Cerrar</button>
           </div>
         </div>
       )}
     </div>
+  )
+}
+
+function EditProductForm({ product, departments, onSave, onCancel }: {
+  product: Product
+  departments: Department[]
+  onSave: (p: Product) => void
+  onCancel: () => void
+}) {
+  const [name, setName] = useState(product.name)
+  const [features, setFeatures] = useState(product.features)
+  const [description, setDescription] = useState(product.description)
+  const [price, setPrice] = useState(product.price)
+  const [departmentId, setDepartmentId] = useState(product.department_id)
+  const [imageUrl, setImageUrl] = useState(product.image_url || '')
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault()
+    onSave({ ...product, name, features, description, price, department_id: departmentId, image_url: imageUrl })
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="edit-product-form">
+      <input value={name} onChange={e => setName(e.target.value)} required placeholder="Nombre" />
+      <input value={features} onChange={e => setFeatures(e.target.value)} required placeholder="Características" />
+      <textarea value={description} onChange={e => setDescription(e.target.value)} placeholder="Descripción (vacío → IA)" />
+      <input type="number" step="0.01" value={price} onChange={e => setPrice(+e.target.value)} placeholder="Precio" />
+      <select value={departmentId} onChange={e => setDepartmentId(+e.target.value)}>
+        {departments.map(d => <option key={d.id} value={d.id}>{d.name}</option>)}
+      </select>
+      <input value={imageUrl} onChange={e => setImageUrl(e.target.value)} placeholder="URL de imagen" />
+      <div className="edit-buttons">
+        <button type="submit">Guardar</button>
+        <button type="button" onClick={onCancel}>Cancelar</button>
+      </div>
+    </form>
   )
 }

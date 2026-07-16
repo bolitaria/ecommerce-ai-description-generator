@@ -1,51 +1,31 @@
-import React, { useState, lazy, Suspense } from 'react'
+import { lazy, Suspense } from 'react'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { CartProvider } from './context/CartContext'
+import { CompareProvider } from './context/CompareContext'
+import CartDrawer from './components/CartDrawer'
+import CompareModal from './components/CompareModal'
 import './App.css'
 
-const Dashboard = lazy(() => import('./components/Dashboard'))
-const Products = lazy(() => import('./components/Products'))
-const AITools = lazy(() => import('./components/AITools'))
-const Orders = lazy(() => import('./components/Orders'))
-const Settings = lazy(() => import('./components/Settings'))
+const Store = lazy(() => import('./components/Store'))
+const ProductDetail = lazy(() => import('./components/ProductDetail'))
+const AdminLayout = lazy(() => import('./components/AdminLayout'))
 
-function App() {
-  const [activeView, setActiveView] = useState('dashboard')
-
-  const renderView = () => {
-    const views: Record<string, React.JSX.Element> = {
-      dashboard: <Dashboard />,
-      products: <Products />,
-      'ai-tools': <AITools />,
-      orders: <Orders />,
-      settings: <Settings />,
-    }
-    return views[activeView] || <Dashboard />
-  }
-
+export default function App() {
   return (
-    <div className="app-layout">
-      <aside className="sidebar">
-        <div className="sidebar-brand">Store Manager</div>
-        <nav className="sidebar-nav">
-          {['dashboard', 'products', 'ai-tools', 'orders', 'settings'].map(v => (
-            <a key={v} href="#" className={activeView === v ? 'active' : ''} onClick={() => setActiveView(v)}>
-              {v.charAt(0).toUpperCase() + v.slice(1).replace('-', ' ')}
-            </a>
-          ))}
-        </nav>
-      </aside>
-      <div className="main-area">
-        <header className="topbar">
-          <h1>{activeView.charAt(0).toUpperCase() + activeView.slice(1)}</h1>
-          <div className="user-menu">My Store</div>
-        </header>
-        <main className="content">
-          <Suspense fallback={<div>Loading...</div>}>
-            {renderView()}
+    <CartProvider>
+      <CompareProvider>
+        <BrowserRouter>
+          <Suspense fallback={<div className="app-loading">Cargando aplicación...</div>}>
+            <Routes>
+              <Route path="/" element={<Store />} />
+              <Route path="/product/:id" element={<ProductDetail />} />
+              <Route path="/admin/*" element={<AdminLayout />} />
+            </Routes>
           </Suspense>
-        </main>
-      </div>
-    </div>
+          <CartDrawer />
+          <CompareModal />
+        </BrowserRouter>
+      </CompareProvider>
+    </CartProvider>
   )
 }
-
-export default App

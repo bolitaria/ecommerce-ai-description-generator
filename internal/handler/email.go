@@ -38,7 +38,7 @@ func (h *EmailHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	subj, body, err := h.aiSvc.GenerateEmail(r.Context(), req.ProductName, req.Features)
 	if err != nil {
-		log.Printf("Email generation error: %v", err) // <-- AÑADIDO
+		log.Printf("Email generation error: %v", err)
 		writeError(w, http.StatusInternalServerError, "email generation failed")
 		return
 	}

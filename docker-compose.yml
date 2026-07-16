@@ -6,8 +6,9 @@ services:
     environment:
       - PORT=8080
       - DATABASE_URL=postgres://user:pass@postgres:5432/store?sslmode=disable
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-sk-fake}
-      - OPENAI_URL=http://mock-openai:5000/v1
+      - DeepSeek_API_KEY=sk-fake
+      - DeepSeek_URL=http://mock-deepseek:5000/v1
+      - DeepSeek_MODEL=mock
       - ENV=mock
       - JWT_SECRET=dev-secret
       - REDIS_URL=redis://redis:6379
@@ -16,15 +17,8 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-      mock-openai:
+      mock-deepseek:
         condition: service_started
-
-  mock-openai:
-    build:
-      context: .
-      dockerfile: Dockerfile.mock
-    ports:
-      - "5001:5000"
 
   frontend:
     build:
@@ -53,6 +47,13 @@ services:
     image: redis:7-alpine
     volumes:
       - redisdata:/data
+
+  mock-deepseek:
+    build:
+      context: .
+      dockerfile: Dockerfile.mock
+    ports:
+      - "5001:5000"
 
 volumes:
   pgdata:

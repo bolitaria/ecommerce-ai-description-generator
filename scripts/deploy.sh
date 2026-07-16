@@ -19,7 +19,7 @@ gcloud run deploy "$SERVICE_NAME" \
   --platform managed \
   --region "$REGION" \
   --allow-unauthenticated \
-  --set-env-vars "OPENAI_API_KEY=$(gcloud secrets versions access latest --secret=openai-api-key)" \
+  --set-env-vars "DeepSeek_API_KEY=$(gcloud secrets versions access latest --secret=deepseek-api-key)" \
   --memory 256Mi \
   --cpu 1 \
   --max-instances 10 \

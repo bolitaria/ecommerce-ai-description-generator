@@ -1,148 +1,72 @@
-.products-container {
-  background: var(--card-bg);
-  border-radius: 12px;
-  padding: 2rem;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+.hint {
+  font-size: 0.8rem;
+  color: var(--text-light);
+  display: block;
+  margin-top: 0.3rem;
 }
-.add-product-section {
-  margin-bottom: 2rem;
-  padding-bottom: 1rem;
-  border-bottom: 1px solid var(--border);
-}
-.add-product-form {
-  display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
-  margin-top: 0.5rem;
-}
-.add-product-form input, .add-product-form select {
-  padding: 0.6rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-}
-.add-btn {
-  background-color: var(--primary);
-  color: white;
-  border: none;
-  padding: 0.6rem 1.2rem;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 600;
-}
-.filters {
+.import-section {
   display: flex;
   gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+.template-link {
+  color: var(--primary);
+  text-decoration: underline;
+  font-size: 0.9rem;
+}
+.excel-preview {
+  background: #f0fdfa;
+  border: 1px solid #99f6e4;
+  padding: 1rem;
+  border-radius: 8px;
   margin-bottom: 1.5rem;
 }
-.filters select, .filters input {
-  padding: 0.5rem;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-}
-.product-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 1.5rem;
-}
-.product-card {
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
-  overflow: hidden;
-  transition: transform 0.2s;
-}
-.product-card:hover {
-  transform: translateY(-3px);
-}
-.product-img-placeholder {
-  height: 140px;
-  background: linear-gradient(135deg, #ff6600, #ff8533);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 1.2rem;
-}
-.product-info {
-  padding: 1rem;
-}
-.product-info h4 {
-  margin-bottom: 0.3rem;
-  color: var(--text);
-}
-.features {
-  font-size: 0.9rem;
-  color: var(--text-light);
+.excel-preview table {
+  width: 100%;
+  border-collapse: collapse;
   margin-bottom: 0.5rem;
 }
-.description {
-  font-size: 0.9rem;
-  line-height: 1.4;
-  margin-bottom: 1rem;
-}
-.card-actions {
-  display: flex;
-  gap: 0.4rem;
-  flex-wrap: wrap;
-}
-.btn-generate, .btn-translate, .btn-email {
-  border: none;
-  padding: 0.4rem 0.8rem;
-  border-radius: 5px;
-  font-weight: 600;
-  cursor: pointer;
+.excel-preview th, .excel-preview td {
+  border: 1px solid #e2e8f0;
+  padding: 0.3rem 0.5rem;
   font-size: 0.85rem;
 }
-.btn-generate { background: var(--primary); color: white; }
-.btn-translate { background: #007bff; color: white; }
-.btn-email { background: #6c757d; color: white; }
-.empty {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-light);
-}
-.pagination {
+.preview-actions {
   display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 1rem;
-  margin-top: 2rem;
+  gap: 0.5rem;
 }
-.pagination button {
-  padding: 0.4rem 1rem;
-  border-radius: 5px;
+.edit-product-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.edit-product-form input, .edit-product-form textarea, .edit-product-form select {
+  padding: 0.4rem;
   border: 1px solid #ddd;
-  background: white;
-  cursor: pointer;
+  border-radius: 4px;
 }
-.modal-overlay {
-  position: fixed;
-  top:0; left:0; right:0; bottom:0;
-  background: rgba(0,0,0,0.5);
+.edit-buttons {
   display: flex;
+  gap: 0.5rem;
+}
+.price {
+  font-weight: 600;
+  color: var(--primary);
+  margin: 0.3rem 0;
+}
+.store-card-actions {
+  display: flex;
+  gap: 0.3rem;
   align-items: center;
-  justify-content: center;
-  z-index: 1000;
+  flex-wrap: wrap;
 }
-.modal {
-  background: white;
-  padding: 2rem;
-  border-radius: 12px;
-  min-width: 400px;
-  max-width: 500px;
-}
-.result-box {
-  margin-top: 1rem;
-  padding: 0.8rem;
-  background: #f9f9f9;
-  border-left: 4px solid var(--primary);
-  border-radius: 6px;
-}
-.error-banner {
-  background: #fdecea;
-  color: #b71c1c;
-  padding: 0.75rem 1rem;
-  border-radius: 8px;
-  margin-bottom: 1rem;
+.store-card-btn.compare {
+  background: #f59e0b;
+  color: white;
+  border: none;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.8rem;
+  cursor: pointer;
 }
