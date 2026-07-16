@@ -1,0 +1,192 @@
+.store-container {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem 1.5rem;
+}
+
+/* Header público */
+.public-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 2rem;
+  background: white;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 2rem;
+}
+
+.public-header .logo {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--primary);
+  cursor: pointer;
+}
+
+.public-header .admin-link {
+  font-size: 0.9rem;
+  color: var(--text-light);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.public-header .admin-link:hover {
+  color: var(--primary);
+}
+
+/* Filtros */
+.store-filters {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+}
+
+.store-filters select,
+.store-filters input {
+  padding: 0.6rem 1rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 0.95rem;
+  background: white;
+}
+
+/* Grid de productos */
+.store-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 1.5rem;
+}
+
+.store-card {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.06);
+  overflow: hidden;
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+
+.store-card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 12px 24px rgba(0,0,0,0.1);
+}
+
+.store-card-image {
+  height: 180px;
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 1.2rem;
+  text-transform: uppercase;
+}
+
+.store-card-body {
+  padding: 1.2rem;
+}
+
+.store-card-body h3 {
+  margin-bottom: 0.3rem;
+  font-size: 1.1rem;
+}
+
+.store-card-features {
+  color: var(--text-light);
+  font-size: 0.9rem;
+  margin-bottom: 0.8rem;
+}
+
+.store-card-desc {
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: 1rem;
+  color: var(--text);
+}
+
+.store-card-desc.placeholder {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+.store-card-price {
+  font-weight: 700;
+  color: var(--primary);
+  font-size: 1.2rem;
+  margin-bottom: 0.8rem;
+}
+
+.store-card-btn {
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.5rem 1.5rem;
+  border-radius: 6px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.store-card-btn:hover {
+  background: var(--primary-hover);
+}
+
+/* Modal de producto */
+.modal-overlay {
+  position: fixed;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.modal-content {
+  background: white;
+  border-radius: 12px;
+  max-width: 600px;
+  width: 90%;
+  padding: 2rem;
+  position: relative;
+}
+
+.modal-close {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  background: none;
+  border: none;
+  font-size: 1.5rem;
+  cursor: pointer;
+}
+
+/* Estados */
+.store-loading,
+.store-empty {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-light);
+}
+
+.store-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.store-pagination button {
+  padding: 0.4rem 1rem;
+  border: 1px solid var(--border);
+  background: white;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.store-pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

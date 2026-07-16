@@ -38,7 +38,7 @@ func (h *GenerateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	desc, err := h.aiSvc.GenerateDescription(r.Context(), req.ProductName, req.Features)
 	if err != nil {
-		log.Printf("AI generation error: %v", err)   // <-- AÑADIDO
+		log.Printf("AI generation error: %v", err)
 		writeError(w, http.StatusInternalServerError, "generation failed")
 		return
 	}

@@ -13,7 +13,7 @@ import (
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/db"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/handler"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/middleware"
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/openai"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/deepseek"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/repository"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
 )
@@ -26,8 +26,8 @@ func Run(cfg *config.Config) {
 	productRepo := repository.NewProductRepo(db.DB)
 	departmentRepo := repository.NewDepartmentRepo(db.DB)
 
-	productSvc := service.NewProductService(productRepo)
-	aiClient := openai.NewClient(cfg.OpenAIKey, cfg.OpenAIURL, cfg.OpenAIModel)
+	aiClient := deepseek.NewClient(cfg.DeepSeekKey, cfg.DeepSeekURL, cfg.DeepSeekModel)
+	productSvc := service.NewProductService(productRepo, aiClient)
 	aiSvc := service.NewAIService(aiClient)
 
 	productH := handler.NewProductHandler(productSvc)
@@ -35,10 +35,13 @@ func Run(cfg *config.Config) {
 	genH := handler.NewGenerateHandler(aiSvc)
 	transH := handler.NewTranslateHandler(aiSvc)
 	emailH := handler.NewEmailHandler(aiSvc)
+	importH := handler.NewImportHandler(productSvc)
 
 	mux := http.NewServeMux()
+
 	mux.HandleFunc("/health", handler.HealthCheck())
 	mux.HandleFunc("/api/v1/departments", deptH.List)
+
 	mux.HandleFunc("/api/v1/products", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
@@ -49,8 +52,11 @@ func Run(cfg *config.Config) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
 	mux.HandleFunc("/api/v1/products/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
+		case http.MethodGet:
+			productH.GetByID(w, r)
 		case http.MethodPut:
 			productH.Update(w, r)
 		case http.MethodDelete:
@@ -59,9 +65,13 @@ func Run(cfg *config.Config) {
 			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		}
 	})
+
 	mux.Handle("/api/v1/generate", genH)
 	mux.Handle("/api/v1/translate", transH)
 	mux.Handle("/api/v1/email", emailH)
+	mux.HandleFunc("/api/v1/products/import", importH.ServeHTTP)
+	mux.HandleFunc("/api/v1/products/import/preview", importH.ServeHTTP)
+	mux.HandleFunc("/api/v1/products/import/template", importH.ServeHTTP)	
 
 	allowedOrigins := []string{"http://localhost:5173"}
 	wrapped := middleware.CORS(allowedOrigins)(

@@ -38,7 +38,7 @@ func (h *TranslateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 	trans, err := h.aiSvc.TranslateText(r.Context(), req.Text, req.TargetLang)
 	if err != nil {
-		log.Printf("Translation error: %v", err)      // <-- AÑADIDO
+		log.Printf("Translation error: %v", err)
 		writeError(w, http.StatusInternalServerError, "translation failed")
 		return
 	}

@@ -1,5 +1,5 @@
 FROM golang:1.22-alpine
 WORKDIR /app
 COPY cmd/mockopenai/main.go .
-RUN go build -o /mockopenai main.go
-CMD ["/mockopenai"]
+RUN go build -o /mockdeepseek main.go
+CMD ["/mockdeepseek"]

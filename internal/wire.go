@@ -8,7 +8,7 @@ import (
 
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/handler"
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/openai"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/deepseek"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/repository"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
 	"github.com/google/wire"
@@ -19,7 +19,7 @@ func InitializeServer(db *sql.DB, apiKey, apiURL, model string) (*handler.Produc
 		repository.NewProductRepo,
 		repository.NewDepartmentRepo,
 		service.NewProductService,
-		openai.NewClient,
+		deepseek.NewClient,
 		service.NewAIService,
 		handler.NewProductHandler,
 		handler.NewDepartmentHandler,

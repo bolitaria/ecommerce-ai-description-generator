@@ -283,9 +283,9 @@ import "os"
 
 type Config struct {
 	Port        string
-	OpenAIKey   string
-	OpenAIURL   string
-	OpenAIModel string
+	DeepSeekKey   string
+	DeepSeekURL   string
+	DeepSeekModel string
 	MaxTokens   int
 	RateLimit   float64
 	Environment string
@@ -299,9 +299,9 @@ type Config struct {
 func Load() *Config {
 	return &Config{
 		Port:        getEnv("PORT", "8080"),
-		OpenAIKey:   os.Getenv("OPENAI_API_KEY"),
-		OpenAIURL:   getEnv("OPENAI_URL", "https://api.openai.com/v1"),
-		OpenAIModel: getEnv("OPENAI_MODEL", "gpt-3.5-turbo"),
+		DeepSeekKey:   os.Getenv("DeepSeek_API_KEY"),
+		DeepSeekURL:   getEnv("DeepSeek_URL", "https://api.deepseek.com/v1"),
+		DeepSeekModel: getEnv("DeepSeek_MODEL", "gpt-3.5-turbo"),
 		MaxTokens:   300,
 		RateLimit:   5.0,
 		Environment: getEnv("ENV", "development"),
@@ -811,9 +811,9 @@ func Recovery(next http.Handler) http.Handler {
 }
 EOF
 
-# ─── 6. Cliente OpenAI con circuit breaker y caché básico ──────
-cat > internal/openai/client.go <<'EOF'
-package openai
+# ─── 6. Cliente DeepSeek con circuit breaker y caché básico ──────
+cat > internal/deepseek/client.go <<'EOF'
+package deepseek
 
 import (
 	"bytes"
@@ -842,7 +842,7 @@ type client struct {
 
 func NewClient(apiKey, baseURL, model string) AIClient {
 	settings := gobreaker.Settings{
-		Name:        "openai",
+		Name:        "deepseek",
 		MaxRequests: 3,
 		Interval:    10 * time.Second,
 		Timeout:     30 * time.Second,
@@ -903,7 +903,7 @@ func (c *client) chatCompletion(ctx context.Context, prompt string, maxTokens in
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			b, _ := io.ReadAll(resp.Body)
-			return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(b))
+			return "", fmt.Errorf("deepseek error %d: %s", resp.StatusCode, string(b))
 		}
 		var aiResp openAIResponse
 		if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
@@ -965,7 +965,7 @@ import (
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/handler"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/middleware"
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/openai"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/deepseek"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/repository"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
 )
@@ -982,7 +982,7 @@ func Run(cfg *config.Config) {
 
 	// 3. Services
 	productSvc := service.NewProductService(productRepo)
-	aiClient := openai.NewClient(cfg.OpenAIKey, cfg.OpenAIURL, cfg.OpenAIModel)
+	aiClient := deepseek.NewClient(cfg.DeepSeekKey, cfg.DeepSeekURL, cfg.DeepSeekModel)
 	aiSvc := service.NewAIService(aiClient)
 
 	// 4. Handlers (versioned API)
@@ -1073,8 +1073,8 @@ import (
 )
 
 func main() {
-	if os.Getenv("OPENAI_API_KEY") == "" && os.Getenv("ENV") != "mock" {
-		log.Fatal("OPENAI_API_KEY environment variable is required")
+	if os.Getenv("DeepSeek_API_KEY") == "" && os.Getenv("ENV") != "mock" {
+		log.Fatal("DeepSeek_API_KEY environment variable is required")
 	}
 	cfg := config.Load()
 	server.Run(cfg)

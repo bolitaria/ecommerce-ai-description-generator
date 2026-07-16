@@ -19,8 +19,8 @@ const fetchStats = async (): Promise<Stats> => {
   return {
     products: prodData.total || 0,
     departments: (deptData.departments || []).length,
-    orders: 142,   // mock
-    revenue: 4280, // mock
+    orders: 142,
+    revenue: 4280,
   }
 }
 
@@ -30,34 +30,41 @@ export default function Dashboard() {
     queryFn: fetchStats,
   })
 
+  const cards = [
+    { label: 'Productos', value: data?.products ?? '...', icon: '📦', color: '#0d9488' },
+    { label: 'Departamentos', value: data?.departments ?? '...', icon: '🏷️', color: '#6366f1' },
+    { label: 'Pedidos', value: data?.orders ?? '...', icon: '📋', color: '#f59e0b' },
+    { label: 'Ingresos', value: `$${(data?.revenue ?? 0).toLocaleString()}`, icon: '💰', color: '#10b981' },
+  ]
+
   return (
-    <div style={{ background: 'white', padding: '2rem', borderRadius: '12px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' }}>
-      <h2 style={{ color: 'var(--primary)' }}>Welcome back, Seller!</h2>
-      <div style={{ display: 'flex', gap: '2rem', marginTop: '1.5rem', flexWrap: 'wrap' }}>
-        <div style={{ background: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', flex: 1, minWidth: '150px' }}>
-          <h3>Products</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-            {isLoading ? '...' : data?.products}
-          </p>
-        </div>
-        <div style={{ background: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', flex: 1, minWidth: '150px' }}>
-          <h3>Departments</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-            {isLoading ? '...' : data?.departments}
-          </p>
-        </div>
-        <div style={{ background: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', flex: 1, minWidth: '150px' }}>
-          <h3>Orders</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-            {isLoading ? '...' : data?.orders}
-          </p>
-        </div>
-        <div style={{ background: '#f9f9f9', padding: '1.5rem', borderRadius: '8px', flex: 1, minWidth: '150px' }}>
-          <h3>Revenue</h3>
-          <p style={{ fontSize: '2rem', fontWeight: 'bold' }}>
-            ${isLoading ? '...' : data?.revenue?.toLocaleString()}
-          </p>
-        </div>
+    <div>
+      <h2 style={{ marginBottom: '1.5rem', color: 'var(--text)' }}>Bienvenido, Seller</h2>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+        gap: '1.5rem'
+      }}>
+        {cards.map(({ label, value, icon, color }) => (
+          <div key={label} style={{
+            background: 'white',
+            borderRadius: 'var(--radius)',
+            padding: '1.8rem',
+            boxShadow: 'var(--shadow-sm)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '1.2rem',
+            borderLeft: `4px solid ${color}`
+          }}>
+            <div style={{ fontSize: '2.5rem' }}>{icon}</div>
+            <div>
+              <p style={{ color: 'var(--text-light)', fontSize: '0.9rem', marginBottom: '0.3rem' }}>{label}</p>
+              <p style={{ fontSize: '2rem', fontWeight: 700, color: 'var(--text)' }}>
+                {isLoading ? '...' : value}
+              </p>
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   )

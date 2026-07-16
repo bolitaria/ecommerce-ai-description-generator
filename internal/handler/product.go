@@ -95,6 +95,20 @@ func (h *ProductHandler) Delete(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (h *ProductHandler) GetByID(w http.ResponseWriter, r *http.Request) {
+	id, err := parseID(r.URL.Path, "/api/v1/products/")
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "invalid product id")
+		return
+	}
+	product, err := h.svc.GetByID(id)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "product not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, product)
+}
+
 func parseID(path, prefix string) (int, error) {
 	idStr := strings.TrimPrefix(path, prefix)
 	return strconv.Atoi(idStr)

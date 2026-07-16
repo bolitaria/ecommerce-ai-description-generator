@@ -1,4 +1,4 @@
-package openai
+package deepseek
 
 import (
 	"bytes"
@@ -27,7 +27,7 @@ type client struct {
 
 func NewClient(apiKey, baseURL, model string) AIClient {
 	settings := gobreaker.Settings{
-		Name:        "openai",
+		Name:        "deepseek",
 		MaxRequests: 3,
 		Interval:    10 * time.Second,
 		Timeout:     30 * time.Second,
@@ -87,7 +87,7 @@ func (c *client) chatCompletion(ctx context.Context, prompt string, maxTokens in
 		defer resp.Body.Close()
 		if resp.StatusCode != http.StatusOK {
 			b, _ := io.ReadAll(resp.Body)
-			return "", fmt.Errorf("openai error %d: %s", resp.StatusCode, string(b))
+			return "", fmt.Errorf("deepseek error %d: %s", resp.StatusCode, string(b))
 		}
 		var aiResp openAIResponse
 		if err := json.NewDecoder(resp.Body).Decode(&aiResp); err != nil {
