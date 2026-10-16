@@ -3,17 +3,18 @@ package server
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/ai"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/config"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/db"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/handler"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/middleware"
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/deepseek"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/repository"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
 )
@@ -23,12 +24,21 @@ func Run(cfg *config.Config) {
 		log.Fatalf("DB init: %v", err)
 	}
 
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+
+	// Build the AI provider fallback chain from config.
+	// Returns nil if no provider has an API key configured.
+	aiGen := ai.NewFromConfig(cfg, logger)
+	if aiGen == nil {
+		log.Fatal("no AI provider configured: set at least one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY or DEEPSEEK_API_KEY")
+	}
+	logger.Info("AI fallback chain ready", "providers", aiGen.ProviderNames())
+
 	productRepo := repository.NewProductRepo(db.DB)
 	departmentRepo := repository.NewDepartmentRepo(db.DB)
 
-	aiClient := deepseek.NewClient(cfg.DeepSeekKey, cfg.DeepSeekURL, cfg.DeepSeekModel)
-	productSvc := service.NewProductService(productRepo, aiClient)
-	aiSvc := service.NewAIService(aiClient)
+	productSvc := service.NewProductService(productRepo, aiGen)
+	aiSvc := service.NewAIService(aiGen)
 
 	productH := handler.NewProductHandler(productSvc)
 	deptH := handler.NewDepartmentHandler(departmentRepo)
@@ -71,7 +81,7 @@ func Run(cfg *config.Config) {
 	mux.Handle("/api/v1/email", emailH)
 	mux.HandleFunc("/api/v1/products/import", importH.ServeHTTP)
 	mux.HandleFunc("/api/v1/products/import/preview", importH.ServeHTTP)
-	mux.HandleFunc("/api/v1/products/import/template", importH.ServeHTTP)	
+	mux.HandleFunc("/api/v1/products/import/template", importH.ServeHTTP)
 
 	allowedOrigins := []string{"http://localhost:5173"}
 	wrapped := middleware.CORS(allowedOrigins)(
