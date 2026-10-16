@@ -39,3 +39,29 @@ Thumbs.db
 *.db-shm
 .env
 .env.example
+
+# Binaries
+/server
+/ecommerce-ai-description-generator
+*.exe
+*.bin
+
+# Test artifacts
+coverage.out
+coverage.html
+test.log
+*.test
+
+# Local env
+.env
+.env.local
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+.terraform.lock.hcl
+
+# K8s local
+kubeconfig
+*.kubeconfig
