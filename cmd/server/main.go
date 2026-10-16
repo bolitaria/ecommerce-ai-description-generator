@@ -9,8 +9,11 @@ import (
 
 func main() {
 	cfg := config.Load()
-	if len(cfg.AIProviders) == 0 && cfg.Environment != "mock" {
-		log.Fatal("no AI provider configured: set at least one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY or DEEPSEEK_API_KEY")
+	if cfg.AIServiceURL == "" {
+		log.Fatal("AI_SERVICE_URL is required")
+	}
+	if cfg.InternalAPIToken == "" && cfg.Environment != "mock" {
+		log.Fatal("INTERNAL_API_TOKEN is required (set ENV=mock to skip in local dev)")
 	}
 	server.Run(cfg)
 }

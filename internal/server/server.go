@@ -10,7 +10,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/bolitaria/ecommerce-ai-description-generator/internal/ai"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/client"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/config"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/db"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/handler"
@@ -26,13 +26,10 @@ func Run(cfg *config.Config) {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	// Build the AI provider fallback chain from config.
-	// Returns nil if no provider has an API key configured.
-	aiGen := ai.NewFromConfig(cfg, logger)
-	if aiGen == nil {
-		log.Fatal("no AI provider configured: set at least one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY or DEEPSEEK_API_KEY")
-	}
-	logger.Info("AI fallback chain ready", "providers", aiGen.ProviderNames())
+	// Build the HTTP client to the AI microservice.
+	// The AI service owns the provider fallback chain.
+	aiGen := client.New(cfg.AIServiceURL, cfg.InternalAPIToken, logger)
+	logger.Info("ai-service client configured", "url", cfg.AIServiceURL)
 
 	productRepo := repository.NewProductRepo(db.DB)
 	departmentRepo := repository.NewDepartmentRepo(db.DB)
