@@ -13,7 +13,10 @@ export default function ShareButtons({ product }: ShareProps) {
     if (navigator.share) {
       try {
         await navigator.share({ title: product.name, text })
-      } catch {}
+      } catch (err) {
+        // User cancelled the share dialog — not an error, just no-op.
+        console.debug('Share cancelled:', err)
+      }
     } else {
       window.open(`https://wa.me/?text=${encodeURIComponent(text)}`, '_blank')
     }
