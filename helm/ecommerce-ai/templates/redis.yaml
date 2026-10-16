@@ -45,7 +45,7 @@ spec:
       containers:
         - name: redis
           image: "{{ .Values.redis.image.repository }}:{{ .Values.redis.image.tag }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          imagePullPolicy: IfNotPresent  # redis image comes from Docker Hub
           ports:
             - name: redis
               containerPort: 6379

@@ -45,7 +45,7 @@ func (s *stubProvider) GenerateEmail(ctx context.Context, productName, features 
 func newTestGenerator(t *testing.T, providers ...namedProvider) *FallbackGenerator {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	return NewFallbackGenerator(providers, logger)
+	return NewFallbackGenerator(providers, logger, nil)
 }
 
 func TestFallback_UsesFirstProviderWhenHealthy(t *testing.T) {

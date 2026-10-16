@@ -14,6 +14,7 @@ import (
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/config"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/db"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/handler"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/metrics"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/middleware"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/repository"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/service"
@@ -26,8 +27,9 @@ func Run(cfg *config.Config) {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	m := metrics.New("core-api")
+
 	// Build the HTTP client to the AI microservice.
-	// The AI service owns the provider fallback chain.
 	aiGen := client.New(cfg.AIServiceURL, cfg.InternalAPIToken, logger)
 	logger.Info("ai-service client configured", "url", cfg.AIServiceURL)
 
@@ -44,12 +46,12 @@ func Run(cfg *config.Config) {
 	emailH := handler.NewEmailHandler(aiSvc)
 	importH := handler.NewImportHandler(productSvc)
 
-	mux := http.NewServeMux()
+	businessMux := http.NewServeMux()
 
-	mux.HandleFunc("/health", handler.HealthCheck())
-	mux.HandleFunc("/api/v1/departments", deptH.List)
+	businessMux.HandleFunc("/health", handler.HealthCheck())
+	businessMux.HandleFunc("/api/v1/departments", deptH.List)
 
-	mux.HandleFunc("/api/v1/products", func(w http.ResponseWriter, r *http.Request) {
+	businessMux.HandleFunc("/api/v1/products", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			productH.List(w, r)
@@ -60,7 +62,7 @@ func Run(cfg *config.Config) {
 		}
 	})
 
-	mux.HandleFunc("/api/v1/products/", func(w http.ResponseWriter, r *http.Request) {
+	businessMux.HandleFunc("/api/v1/products/", func(w http.ResponseWriter, r *http.Request) {
 		switch r.Method {
 		case http.MethodGet:
 			productH.GetByID(w, r)
@@ -73,25 +75,32 @@ func Run(cfg *config.Config) {
 		}
 	})
 
-	mux.Handle("/api/v1/generate", genH)
-	mux.Handle("/api/v1/translate", transH)
-	mux.Handle("/api/v1/email", emailH)
-	mux.HandleFunc("/api/v1/products/import", importH.ServeHTTP)
-	mux.HandleFunc("/api/v1/products/import/preview", importH.ServeHTTP)
-	mux.HandleFunc("/api/v1/products/import/template", importH.ServeHTTP)
+	businessMux.Handle("/api/v1/generate", genH)
+	businessMux.Handle("/api/v1/translate", transH)
+	businessMux.Handle("/api/v1/email", emailH)
+	businessMux.HandleFunc("/api/v1/products/import", importH.ServeHTTP)
+	businessMux.HandleFunc("/api/v1/products/import/preview", importH.ServeHTTP)
+	businessMux.HandleFunc("/api/v1/products/import/template", importH.ServeHTTP)
 
 	allowedOrigins := []string{"http://localhost:5173"}
-	wrapped := middleware.CORS(allowedOrigins)(
+	businessHandler := middleware.CORS(allowedOrigins)(
 		middleware.Recovery(
 			middleware.Logging(
-				middleware.RateLimitPerIP(cfg.RateLimit)(mux),
+				middleware.RateLimitPerIP(cfg.RateLimit)(
+					m.HTTPMiddleware(businessMux),
+				),
 			),
 		),
 	)
 
+	// Root mux: business routes (wrapped) + raw /metrics (unwrapped).
+	root := http.NewServeMux()
+	root.Handle("/", businessHandler)
+	root.Handle("/metrics", m.Handler())
+
 	srv := &http.Server{
 		Addr:         ":" + cfg.Port,
-		Handler:      wrapped,
+		Handler:      root,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,

@@ -34,6 +34,7 @@ spec:
       app.kubernetes.io/instance: {{ .Release.Name }}
   policyTypes: [Ingress]
   ingress:
+    # From the ingress controller (direct Ingress routes to /api/*).
     - from:
         - namespaceSelector:
             matchLabels:
@@ -41,6 +42,16 @@ spec:
       ports:
         - port: 8080
           protocol: TCP
+    # From the frontend pod (nginx proxy_pass to core-api).
+    - from:
+        - podSelector:
+            matchLabels:
+              app.kubernetes.io/name: frontend
+              app.kubernetes.io/instance: {{ .Release.Name }}
+      ports:
+        - port: 8080
+          protocol: TCP
+    # From the ai-service (unlikely but kept for symmetry / future callbacks).
     - from:
         - podSelector:
             matchLabels:
@@ -171,4 +182,62 @@ spec:
               app.kubernetes.io/instance: {{ .Release.Name }}
       ports:
         - port: 5000
+          protocol: TCP
+---
+# Allow Prometheus (namespace: monitoring) to scrape /metrics from our pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [core-api, ai-service]
+      - key: app.kubernetes.io/instance
+        operator: In
+        values: [{{ .Release.Name }}]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
+          protocol: TCP
+---
+# Allow Prometheus (namespace: monitoring) to scrape /metrics from our pods.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-prometheus-scrape
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchExpressions:
+      - key: app.kubernetes.io/name
+        operator: In
+        values: [core-api, ai-service]
+      - key: app.kubernetes.io/instance
+        operator: In
+        values: [{{ .Release.Name }}]
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 8080
+          protocol: TCP
+        - port: 8081
           protocol: TCP
