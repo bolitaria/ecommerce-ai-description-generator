@@ -25,6 +25,8 @@ export function CompareProvider({ children }: { children: ReactNode }) {
   )
 }
 
+// Context files legitimately export both a Provider component and a hook.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCompare() {
   const ctx = useContext(CompareContext)
   if (!ctx) throw new Error('useCompare debe usarse dentro de CompareProvider')

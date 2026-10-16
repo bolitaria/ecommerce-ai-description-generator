@@ -41,6 +41,8 @@ export function CartProvider({ children }: { children: ReactNode }) {
   return <CartContext.Provider value={{ state, dispatch }}>{children}</CartContext.Provider>
 }
 
+// Context files legitimately export both a Provider component and a hook.
+// eslint-disable-next-line react-refresh/only-export-components
 export function useCart() {
   const ctx = useContext(CartContext)
   if (!ctx) throw new Error('useCart debe usarse dentro de CartProvider')
