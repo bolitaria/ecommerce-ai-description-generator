@@ -1,42 +1,49 @@
-.PHONY: help build test lint docker-build docker-run docker-stop clean migrate-up gen release monitoring-up monitoring-down
+.PHONY: help test helm-lint helm-deps helm-template kind-create kind-delete k8s-deploy k8s-undeploy
 
-APP_NAME := ecommerce-ai-description-generator
+help:
+	@echo "Targets:"
+	@echo "  test            - run Go + frontend tests"
+	@echo "  helm-lint       - lint all charts"
+	@echo "  helm-deps       - update dependencies for all sub-charts"
+	@echo "  helm-template   - render the umbrella chart to stdout"
+	@echo "  kind-create     - create a local kind cluster"
+	@echo "  kind-delete     - delete the local kind cluster"
+	@echo "  k8s-deploy      - install the umbrella chart into the cluster"
+	@echo "  k8s-undeploy    - uninstall the umbrella chart"
 
-help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+test:
+	go build ./... && go test ./...
+	cd web && npm ci && npm run lint && npm run build
 
-build: ## Compile backend
-	go build -ldflags="-s -w" -o $(APP_NAME) ./cmd/server
+helm-lint:
+	helm lint helm/charts/common
+	helm lint helm/ecommerce-ai
 
-test: ## Run unit tests
-	go test -v -race -coverprofile=coverage.out $$(go list ./... | grep -v /web/)
+helm-deps:
+	@for chart in helm/ecommerce-ai/charts/*/; do \
+		echo "==> helm dependency update $$chart"; \
+		helm dependency update "$$chart"; \
+	done
+	helm dependency update helm/ecommerce-ai
 
-lint: ## Lint Go code
-	golangci-lint run --timeout=3m
+helm-template: helm-deps
+	helm template ecommerce-ai helm/ecommerce-ai -f helm/ecommerce-ai/values-dev.yaml
 
-docker-build: ## Build Docker images
-	docker-compose build
+kind-create:
+	@if kind get clusters 2>/dev/null | grep -q '^ecommerce-ai$$'; then \
+		echo "cluster ecommerce-ai already exists"; \
+	else \
+		kind create cluster --config k8s/kind-config.yaml; \
+	fi
 
-docker-run: ## Start full stack
-	docker-compose up -d
+kind-delete:
+	kind delete cluster --name ecommerce-ai
 
-docker-stop: ## Stop all services
-	docker-compose down
+k8s-deploy: helm-deps
+	helm upgrade --install ecommerce-ai helm/ecommerce-ai \
+		--namespace ecommerce-ai --create-namespace \
+		-f helm/ecommerce-ai/values-dev.yaml
 
-clean: ## Remove build artifacts
-	rm -f $(APP_NAME) coverage.out coverage.html
-
-migrate-up: ## Apply database migrations
-	go run cmd/migrate/main.go up
-
-gen: ## Generate code (wire, swag)
-	go generate ./...
-
-release: ## Create new release (semantic-release)
-	npx semantic-release
-
-monitoring-up: ## Start Prometheus + Grafana
-	docker-compose -f deploy/monitoring/docker-compose.yml up -d
-
-monitoring-down: ## Stop monitoring stack
-	docker-compose -f deploy/monitoring/docker-compose.yml down
+k8s-undeploy:
+	helm uninstall ecommerce-ai --namespace ecommerce-ai || true
+	kubectl delete namespace ecommerce-ai --ignore-not-found

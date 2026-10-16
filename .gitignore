@@ -72,3 +72,13 @@ kubeconfig
 
 # golangci-lint migrate backup
 .golangci.bck.yml
+
+# Helm
+helm/**/charts/*.tgz
+helm/**/charts/**/charts/*.tgz
+helm/**/Chart.lock
+
+# Helm
+helm/**/charts/*.tgz
+helm/**/charts/**/charts/*.tgz
+helm/**/Chart.lock

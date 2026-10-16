@@ -1,0 +1,95 @@
+# Default global values (overridden by the umbrella chart).
+# Needed so the sub-chart can be linted/templated in isolation.
+global:
+  imageRegistry: ""
+  imageTag: latest
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+  environment: development
+
+replicaCount: 2
+
+image:
+  repository: backend
+  # registry + tag come from global (chart-level values)
+
+imagePullPolicy: ""  # falls back to global.imagePullPolicy
+
+service:
+  type: ClusterIP
+  port: 8080
+
+serviceAccount:
+  create: true
+  name: ""
+
+podAnnotations: {}
+podLabels: {}
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 128Mi
+  limits:
+    cpu: 500m
+    memory: 512Mi
+
+# Zero-downtime rollout.
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 0
+    maxSurge: 1
+
+terminationGracePeriodSeconds: 30
+
+# Pod Security Standards (restricted profile).
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 65532
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop: ["ALL"]
+
+livenessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 10
+  periodSeconds: 10
+  timeoutSeconds: 3
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 3
+  periodSeconds: 5
+  timeoutSeconds: 2
+  failureThreshold: 2
+
+startupProbe:
+  httpGet:
+    path: /health
+    port: 8080
+  initialDelaySeconds: 2
+  periodSeconds: 2
+  failureThreshold: 30
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceMonitor:
+  # Enable once the /metrics endpoint is exposed by the app.
+  enabled: false
+  interval: 30s
+  path: /metrics
+  labels: {}

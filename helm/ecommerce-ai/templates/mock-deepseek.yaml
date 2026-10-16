@@ -1,0 +1,67 @@
+{{- if and .Values.postgres.enabled (eq .Values.global.environment "development") -}}
+{{/*
+Mock DeepSeek provider for local clusters. Only rendered in development
+(heuristic: postgres.enabled, since prod uses managed datastores).
+*/}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-deepseek
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mock-deepseek
+spec:
+  selector:
+    app.kubernetes.io/component: mock-deepseek
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: 5000
+      targetPort: 5000
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-deepseek
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+    app.kubernetes.io/component: mock-deepseek
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/component: mock-deepseek
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        {{- include "common.labels" . | nindent 8 }}
+        app.kubernetes.io/component: mock-deepseek
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65532
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: mock
+          image: "{{- if .Values.global.imageRegistry }}{{ .Values.global.imageRegistry }}/{{ end }}mock-deepseek:{{ .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          ports:
+            - name: http
+              containerPort: 5000
+          resources:
+            requests: { cpu: 10m, memory: 32Mi }
+            limits:   { cpu: 100m, memory: 64Mi }
+          readinessProbe:
+            tcpSocket: { port: 5000 }
+            initialDelaySeconds: 3
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+{{- end }}

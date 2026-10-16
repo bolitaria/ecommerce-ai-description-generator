@@ -1,0 +1,56 @@
+# ==============================================================================
+# Development overrides — local kind cluster.
+# ==============================================================================
+
+global:
+  # Local images loaded via `kind load docker-image`.
+  # Empty registry → image reference is just `<repository>:<tag>`.
+  imageRegistry: ""
+  imageTag: dev
+  imagePullPolicy: Never
+  environment: development
+
+ingress:
+  host: ecommerce-ai.local
+  tls:
+    enabled: false
+
+secrets:
+  internalApiToken: "dev-internal-token"
+  jwtSecret: "dev-jwt-secret"
+  databaseUrl: "postgres://user:pass@postgres:5432/store?sslmode=disable"
+  redisUrl: "redis://redis:6379"
+  deepseekApiKey: "sk-fake"
+  deepseekUrl: "http://mock-deepseek:5000/v1"
+  deepseekModel: "mock"
+  groqApiKey: ""
+  geminiApiKey: ""
+  openrouterApiKey: ""
+
+core-api:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: backend
+
+ai-service:
+  enabled: true
+  replicaCount: 1
+  autoscaling:
+    enabled: false       # kind is a single node
+  image:
+    repository: ai-service
+
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: frontend
+
+postgres:
+  enabled: true
+  storage:
+    size: 1Gi
+
+redis:
+  enabled: true

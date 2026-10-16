@@ -1,0 +1,92 @@
+# ==============================================================================
+# Global values shared by all sub-charts.
+# ==============================================================================
+global:
+  # Image registry + tag. Override per-environment in values-dev/prod.
+  imageRegistry: ghcr.io/bolitaria/ecommerce-ai-description-generator
+  imageTag: latest
+  imagePullPolicy: IfNotPresent
+  imagePullSecrets: []
+
+  # Common environment.
+  environment: production
+
+# ==============================================================================
+# Ingress
+# ==============================================================================
+ingress:
+  enabled: true
+  className: nginx
+  host: ecommerce-ai.local
+  annotations: {}
+  tls:
+    enabled: false
+    secretName: ""
+
+# ==============================================================================
+# Secrets — DO NOT commit real values.
+#
+# For local dev, values-dev.yaml overrides these with dummy values.
+# For production, use SOPS-encrypted values or External Secrets Operator.
+# ==============================================================================
+secrets:
+  internalApiToken: ""
+  jwtSecret: ""
+  databaseUrl: ""
+  redisUrl: "redis://redis:6379"
+  deepseekApiKey: ""
+  deepseekUrl: "https://api.deepseek.com/v1"
+  deepseekModel: "deepseek-chat"
+  groqApiKey: ""
+  geminiApiKey: ""
+  openrouterApiKey: ""
+
+# ==============================================================================
+# Datastores (Postgres, Redis)
+# For dev: plain Deployments in the umbrella. For prod: replace with a managed
+# service (Cloud SQL, RDS, ElastiCache) or an operator (CloudNativePG).
+# ==============================================================================
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+  auth:
+    username: user
+    password: pass
+    database: store
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  storage:
+    size: 1Gi
+
+redis:
+  enabled: true
+  image:
+    repository: redis
+    tag: "7-alpine"
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      cpu: 100m
+      memory: 128Mi
+
+# ==============================================================================
+# Sub-chart toggles. Actual values live in the sub-chart values.yaml, and are
+# overridden here (or in values-dev/prod.yaml) as needed.
+# ==============================================================================
+core-api:
+  enabled: true
+
+ai-service:
+  enabled: true
+
+frontend:
+  enabled: true
