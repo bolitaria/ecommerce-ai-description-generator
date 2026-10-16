@@ -13,6 +13,7 @@ import (
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/ai"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/aiservice"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/config"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/metrics"
 )
 
 func main() {
@@ -22,7 +23,6 @@ func main() {
 	cfg := config.Load()
 
 	// Healthcheck mode: used by Docker/K8s health probes.
-	// Distroless images have no shell, so the binary itself probes.
 	if *healthcheck {
 		port := cfg.AIServicePort()
 		url := fmt.Sprintf("http://localhost:%s/healthz", port)
@@ -45,11 +45,13 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
-	aiGen := ai.NewFromConfig(cfg, logger)
+	m := metrics.New("ai-service")
+
+	aiGen := ai.NewFromConfig(cfg, logger, m)
 	if aiGen == nil {
 		log.Fatal("no AI provider configured: set at least one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY or DEEPSEEK_API_KEY")
 	}
 	logger.Info("AI fallback chain ready", "providers", aiGen.ProviderNames())
 
-	aiservice.Run(cfg, aiGen, logger)
+	aiservice.Run(cfg, aiGen, logger, m)
 }

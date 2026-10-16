@@ -12,11 +12,13 @@ import (
 
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/config"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
+	"github.com/bolitaria/ecommerce-ai-description-generator/internal/metrics"
 )
 
 // Run starts the AI Service HTTP server and blocks until SIGINT/SIGTERM.
-func Run(cfg *config.Config, ai domain.AIGenerator, logger *slog.Logger) {
-	router := NewRouter(ai, cfg.InternalAPIToken, logger)
+// If m is non-nil, HTTP requests are instrumented and /metrics is exposed.
+func Run(cfg *config.Config, ai domain.AIGenerator, logger *slog.Logger, m *metrics.Metrics) {
+	router := NewRouter(ai, cfg.InternalAPIToken, logger, m)
 
 	srv := &http.Server{
 		Addr:              ":" + cfg.AIServicePort(),

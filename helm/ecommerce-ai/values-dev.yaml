@@ -32,6 +32,10 @@ core-api:
   replicaCount: 1
   image:
     repository: backend
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
 
 ai-service:
   enabled: true
@@ -40,6 +44,10 @@ ai-service:
     enabled: false       # kind is a single node
   image:
     repository: ai-service
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
 
 frontend:
   enabled: true

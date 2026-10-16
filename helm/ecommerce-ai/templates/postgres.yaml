@@ -55,7 +55,7 @@ spec:
       containers:
         - name: postgres
           image: "{{ .Values.postgres.image.repository }}:{{ .Values.postgres.image.tag }}"
-          imagePullPolicy: {{ .Values.global.imagePullPolicy }}
+          imagePullPolicy: IfNotPresent  # postgres image comes from Docker Hub
           ports:
             - name: postgres
               containerPort: 5432

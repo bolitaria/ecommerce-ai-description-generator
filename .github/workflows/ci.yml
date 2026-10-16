@@ -10,7 +10,7 @@ permissions:
   packages: write
 
 env:
-  GO_VERSION: '1.25'
+  GO_VERSION: '1.26'
   NODE_VERSION: '20'
 
 jobs:
@@ -82,7 +82,11 @@ jobs:
           sudo mv kubeconform /usr/local/bin/
       - name: Validate manifests with kubeconform
         run: |
-          kubeconform -strict -summary /tmp/rendered.yaml
+          kubeconform -strict -summary \
+            -schema-location default \
+            -schema-location 'https://raw.githubusercontent.com/yannh/kubernetes-json-schema/master/{{ .NormalizedKubernetesVersion }}-standalone{{ .StrictSuffix }}/{{ .ResourceKind }}{{ .KindSuffix }}.json' \
+            -schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{ .Group }}/{{ .ResourceKind }}_{{ .ResourceAPIVersion }}.json' \
+            /tmp/rendered.yaml
 
   build-and-push:
     needs: [backend-test, frontend-test]

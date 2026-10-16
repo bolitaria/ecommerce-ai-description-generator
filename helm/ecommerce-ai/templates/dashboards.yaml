@@ -1,0 +1,24 @@
+{{/*
+Provision Grafana dashboards as ConfigMaps.
+The kube-prometheus-stack Grafana sidecar watches for ConfigMaps with
+the label `grafana_dashboard: "1"` and loads them automatically.
+*/}}
+{{- $files := .Files.Glob "dashboards/*.json" }}
+{{- if $files }}
+{{- range $path, $_ := $files }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $.Release.Name }}-dashboard-{{ base $path | trimSuffix ".json" | replace "_" "-" | lower }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "common.labels" $ | nindent 4 }}
+    grafana_dashboard: "1"
+  annotations:
+    grafana_folder: "Ecommerce-AI"
+data:
+  {{ base $path }}: |-
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}
+{{- end }}
