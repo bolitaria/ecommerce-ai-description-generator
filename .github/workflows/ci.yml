@@ -23,10 +23,13 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-go@v5
-        with: { go-version: '${{ env.GO_VERSION }}' }
+        with:
+          go-version: '${{ env.GO_VERSION }}'
       - name: Lint
         uses: golangci/golangci-lint-action@v6
-        with: { version: v1.64.8, args: --timeout=3m }
+        with:
+          version: v1.64.8
+          args: --timeout=3m
       - name: Test
         env:
           DATABASE_URL: postgres://test:test@localhost:5432/testdb?sslmode=disable
@@ -40,7 +43,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: '${{ env.NODE_VERSION }}' }
+        with:
+          node-version: '${{ env.NODE_VERSION }}'
       - run: npm ci
       - run: npm run lint
       - run: npm run build
@@ -58,22 +62,33 @@ jobs:
           username: "${{ github.actor }}"
           password: "${{ secrets.GITHUB_TOKEN }}"
       - uses: docker/build-push-action@v6
-        with: { context: ., file: ./Dockerfile, push: true, tags: ghcr.io/${{ github.repository }}/backend:latest }
-      - uses: docker/build-push-action@v6
-        with: { context: ., file: ./Dockerfile.frontend, push: true, tags: ghcr.io/${{ github.repository }}/frontend:latest }
-
-  deploy:
-    needs: build-and-push
-    if: github.ref == 'refs/heads/main'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: google-github-actions/deploy-cloudrun@v2
         with:
-          service: ${{ secrets.CLOUD_RUN_SERVICE }}
-          image: ghcr.io/${{ github.repository }}/backend:latest
-          region: ${{ secrets.GCP_REGION }}
-          credentials: ${{ secrets.GCP_SA_KEY }}
-          env_vars: |
-            DATABASE_URL=${{ secrets.DATABASE_URL }}
-            DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
-            JWT_SECRET=${{ secrets.JWT_SECRET }}
+          context: .
+          file: ./Dockerfile
+          push: true
+          tags: ghcr.io/${{ github.repository }}/backend:latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.frontend
+          push: true
+          tags: ghcr.io/${{ github.repository }}/frontend:latest
+
+
+  # Deploy job deshabilitado hasta migrar a K8s.
+  # Se reactivará cuando existan manifests y clúster.
+#   deploy:
+#     needs: build-and-push
+#     if: github.ref == 'refs/heads/main'
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: google-github-actions/deploy-cloudrun@v2
+#         with:
+#           service: ${{ secrets.CLOUD_RUN_SERVICE }}
+#           image: ghcr.io/${{ github.repository }}/backend:latest
+#           region: ${{ secrets.GCP_REGION }}
+#           credentials: ${{ secrets.GCP_SA_KEY }}
+#           env_vars: |
+#             DATABASE_URL=${{ secrets.DATABASE_URL }}
+#             DEEPSEEK_API_KEY=${{ secrets.DEEPSEEK_API_KEY }}
+#             JWT_SECRET=${{ secrets.JWT_SECRET }}
