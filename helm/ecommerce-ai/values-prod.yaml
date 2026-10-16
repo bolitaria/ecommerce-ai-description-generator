@@ -1,0 +1,38 @@
+# ==============================================================================
+# Production overrides — cloud cluster (GKE/EKS/AKS).
+#
+# Secrets are NOT set here. They are provided at deploy time via:
+#   - SOPS-encrypted values files, or
+#   - External Secrets Operator (secrets manager of the cloud provider).
+# ==============================================================================
+
+global:
+  imageTag: ""             # REQUIRED: set to a specific commit SHA at deploy time
+  imagePullPolicy: IfNotPresent
+  environment: production
+
+ingress:
+  host: ecommerce-ai.example.com
+  tls:
+    enabled: true
+    secretName: ecommerce-ai-tls
+
+core-api:
+  enabled: true
+  replicaCount: 2
+
+ai-service:
+  enabled: true
+  replicaCount: 2
+
+frontend:
+  enabled: true
+  replicaCount: 2
+
+# In production, disable in-cluster datastores and use managed services
+# by pointing secrets.databaseUrl and secrets.redisUrl to cloud endpoints.
+postgres:
+  enabled: false
+
+redis:
+  enabled: false

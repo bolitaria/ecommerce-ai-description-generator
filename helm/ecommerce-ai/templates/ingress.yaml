@@ -1,0 +1,50 @@
+{{- if .Values.ingress.enabled -}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+  annotations:
+    # Expose the Core API's health endpoint to the load balancer.
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host | quote }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host | quote }}
+      http:
+        paths:
+          # Core API handles /api/* and /health.
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ecommerce-ai.coreApiService" . }}
+                port:
+                  number: 8080
+          - path: /health
+            pathType: Exact
+            backend:
+              service:
+                name: {{ include "ecommerce-ai.coreApiService" . }}
+                port:
+                  number: 8080
+          # Frontend catches everything else.
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "ecommerce-ai.frontendService" . }}
+                port:
+                  number: 80
+{{- end }}

@@ -53,6 +53,37 @@ jobs:
       - run: npm run lint
       - run: npm run build
 
+  helm-validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: azure/setup-helm@v4
+        with:
+          version: v3.16.2
+      - name: Update dependencies
+        run: |
+          for svc in core-api ai-service frontend; do
+            helm dependency update "helm/ecommerce-ai/charts/$svc"
+          done
+          helm dependency update helm/ecommerce-ai
+      - name: Lint library chart
+        run: helm lint helm/charts/common
+      - name: Lint umbrella chart
+        run: helm lint helm/ecommerce-ai
+      - name: Render templates (sanity check)
+        run: |
+          helm template ecommerce-ai helm/ecommerce-ai \
+            -f helm/ecommerce-ai/values-dev.yaml \
+            --namespace ecommerce-ai > /tmp/rendered.yaml
+          echo "Rendered $(grep -c '^kind:' /tmp/rendered.yaml) resources"
+      - name: Install kubeconform
+        run: |
+          curl -sSL https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz | tar xz
+          sudo mv kubeconform /usr/local/bin/
+      - name: Validate manifests with kubeconform
+        run: |
+          kubeconform -strict -summary /tmp/rendered.yaml
+
   build-and-push:
     needs: [backend-test, frontend-test]
     if: github.ref == 'refs/heads/main'
