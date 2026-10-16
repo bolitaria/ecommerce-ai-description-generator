@@ -23,6 +23,18 @@ type Config struct {
 	JWTSecret     string
 	RedisURL      string
 
+	// AIServiceURL is the base URL of the AI microservice.
+	// Local dev: http://localhost:8081
+	// Docker:    http://ai-service:8081
+	// K8s:       http://ai-service.default.svc.cluster.local:8081
+	AIServiceURL string
+
+	// AIServiceListenPort is the port the AI Service binds to.
+	AIServiceListenPort string
+
+	// InternalAPIToken is the shared secret for service-to-service auth.
+	InternalAPIToken string
+
 	// AIProviders is the ordered fallback chain.
 	// Priority: Groq > Gemini > OpenRouter > DeepSeek.
 	// Only providers with a non-empty API key are included.
@@ -42,6 +54,13 @@ func Load() *Config {
 		DatabaseURL:   getEnv("DATABASE_URL", "postgres://user:pass@localhost:5432/store?sslmode=disable"),
 		JWTSecret:     getEnv("JWT_SECRET", "dev-secret-change-me"),
 		RedisURL:      getEnv("REDIS_URL", "redis://localhost:6379"),
+
+		// AI Service connection (used by Core API)
+		AIServiceURL:     getEnv("AI_SERVICE_URL", "http://localhost:8081"),
+		InternalAPIToken: os.Getenv("INTERNAL_API_TOKEN"),
+
+		// AI Service listen port (used by AI Service itself)
+		AIServiceListenPort: getEnv("AI_SERVICE_PORT", "8081"),
 	}
 	c.AIProviders = buildProviderChain(c)
 	return c
@@ -96,4 +115,9 @@ func getEnv(key, fallback string) string {
 		return v
 	}
 	return fallback
+}
+
+// AIServicePort returns the port the AI Service should listen on.
+func (c *Config) AIServicePort() string {
+	return c.AIServiceListenPort
 }

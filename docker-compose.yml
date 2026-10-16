@@ -1,25 +1,49 @@
 services:
   backend:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
     ports:
       - "8080:8080"
     environment:
       - PORT=8080
-      - DATABASE_URL=postgres://user:pass@postgres:5432/store?sslmode=disable
       - ENV=mock
+      - DATABASE_URL=postgres://user:pass@postgres:5432/store?sslmode=disable
       - JWT_SECRET=dev-secret
       - REDIS_URL=redis://redis:6379
+      - AI_SERVICE_URL=http://ai-service:8081
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      ai-service:
+        condition: service_healthy
+
+  ai-service:
+    build:
+      context: .
+      dockerfile: Dockerfile.ai-service
+    ports:
+      - "8081:8081"
+    environment:
+      - AI_SERVICE_PORT=8081
+      - ENV=mock
+      - INTERNAL_API_TOKEN=${INTERNAL_API_TOKEN:-dev-internal-token}
       - DEEPSEEK_API_KEY=sk-fake
       - DEEPSEEK_URL=http://mock-deepseek:5000/v1
       - DEEPSEEK_MODEL=mock
       - GROQ_API_KEY=${GROQ_API_KEY:-}
       - GEMINI_API_KEY=${GEMINI_API_KEY:-}
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+    healthcheck:
+      test: ["CMD", "/ai-service", "-healthcheck"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
     depends_on:
-      postgres:
-        condition: service_healthy
-      redis:
-        condition: service_started
       mock-deepseek:
         condition: service_started
 

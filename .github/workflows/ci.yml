@@ -73,13 +73,25 @@ jobs:
           context: .
           file: ./Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}/backend:latest
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile.ai-service
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/ai-service:latest
+            ghcr.io/${{ github.repository }}/ai-service:${{ github.sha }}
       - uses: docker/build-push-action@v6
         with:
           context: .
           file: ./Dockerfile.frontend
           push: true
-          tags: ghcr.io/${{ github.repository }}/frontend:latest
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend:latest
+            ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
 
 
   # Deploy job deshabilitado hasta migrar a K8s.
