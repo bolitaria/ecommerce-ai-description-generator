@@ -96,10 +96,10 @@ func TestHTTPMiddleware_CountsRequests(t *testing.T) {
 	body, _ := io.ReadAll(rec2.Body)
 	text := string(body)
 
-	if !strings.Contains(text, `http_requests_total{method="GET",path="/hello",app="test-service",status="200"} 2`) {
+	if !strings.Contains(text, `http_requests_total{app="test-service",method="GET",path="/hello",status="200"} 2`) {
 		t.Errorf("expected /hello counter == 2, got:\n%s", grep(text, "http_requests_total"))
 	}
-	if !strings.Contains(text, `http_requests_total{method="GET",path="/boom",app="test-service",status="500"} 1`) {
+	if !strings.Contains(text, `http_requests_total{app="test-service",method="GET",path="/boom",status="500"} 1`) {
 		t.Errorf("expected /boom counter == 1, got:\n%s", grep(text, "http_requests_total"))
 	}
 }
