@@ -6,9 +6,9 @@ services:
     environment:
       - PORT=8080
       - DATABASE_URL=${DATABASE_URL}
-      - DeepSeek_API_KEY=${DeepSeek_API_KEY}
-      - DeepSeek_URL=${DeepSeek_URL}
-      - DeepSeek_MODEL=${DeepSeek_MODEL}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - DEEPSEEK_URL=${DEEPSEEK_URL}
+      - DEEPSEEK_MODEL=${DEEPSEEK_MODEL}
       - ENV=production
       - JWT_SECRET=${JWT_SECRET}
       - REDIS_URL=redis://redis:6379
