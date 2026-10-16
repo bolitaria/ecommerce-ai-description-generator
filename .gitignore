@@ -68,3 +68,6 @@ kubeconfig
 
 # Backups
 *.bak
+
+# golangci-lint migrate backup
+.golangci.bck.yml

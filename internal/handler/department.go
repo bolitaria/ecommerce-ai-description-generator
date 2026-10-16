@@ -2,6 +2,7 @@ package handler
 
 import (
 	"net/http"
+
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
 )
 

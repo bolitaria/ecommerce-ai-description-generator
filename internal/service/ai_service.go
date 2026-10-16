@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/domain"
 )
 

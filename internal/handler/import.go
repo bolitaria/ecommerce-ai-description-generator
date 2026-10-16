@@ -104,7 +104,7 @@ func (h *ImportHandler) downloadTemplate(w http.ResponseWriter, r *http.Request)
 	headers := []string{"name", "features", "department_id", "image_url", "price"}
 	for i, h := range headers {
 		cell, _ := excelize.CoordinatesToCellName(i+1, 1)
-		f.SetCellValue(sheet, cell, h)
+		_ = f.SetCellValue(sheet, cell, h)
 	}
 	// Datos de ejemplo
 	examples := [][]interface{}{
@@ -114,7 +114,7 @@ func (h *ImportHandler) downloadTemplate(w http.ResponseWriter, r *http.Request)
 	for i, row := range examples {
 		for j, val := range row {
 			cell, _ := excelize.CoordinatesToCellName(j+1, i+2)
-			f.SetCellValue(sheet, cell, val)
+			_ = f.SetCellValue(sheet, cell, val)
 		}
 	}
 	w.Header().Set("Content-Type", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

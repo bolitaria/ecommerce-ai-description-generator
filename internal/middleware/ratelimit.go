@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"sync"
+
 	"golang.org/x/time/rate"
 )
 

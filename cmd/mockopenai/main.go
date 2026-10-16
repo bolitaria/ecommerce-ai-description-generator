@@ -22,7 +22,7 @@ func main() {
 	http.HandleFunc("/v1/chat/completions", func(w http.ResponseWriter, r *http.Request) {
 		bodyBytes, _ := io.ReadAll(r.Body)
 		var req map[string]interface{}
-		json.Unmarshal(bodyBytes, &req)
+		_ = json.Unmarshal(bodyBytes, &req)
 
 		messages := req["messages"].([]interface{})
 		userMsg := messages[0].(map[string]interface{})["content"].(string)
@@ -49,10 +49,10 @@ func main() {
 			},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(resp)
+		_ = json.NewEncoder(w).Encode(resp)
 	})
 	log.Println("Mock DeepSeek listening on :5000")
-	http.ListenAndServe(":5000", nil)
+	log.Fatal(http.ListenAndServe(":5000", nil))
 }
 
 func mockTranslate(prompt string) string {
