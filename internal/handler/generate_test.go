@@ -42,7 +42,9 @@ func TestGenerateHandler_Success(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 	var resp map[string]string
-	json.NewDecoder(rec.Body).Decode(&resp)
+	if err := json.NewDecoder(rec.Body).Decode(&resp); err != nil {
+		t.Fatalf("failed to decode response: %v", err)
+	}
 	if resp["description"] == "" {
 		t.Error("expected a description")
 	}
