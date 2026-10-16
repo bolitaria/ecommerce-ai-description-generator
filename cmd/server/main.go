@@ -2,16 +2,15 @@ package main
 
 import (
 	"log"
-	"os"
 
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/config"
 	"github.com/bolitaria/ecommerce-ai-description-generator/internal/server"
 )
 
 func main() {
-	if os.Getenv("DeepSeek_API_KEY") == "" && os.Getenv("ENV") != "mock" {
-		log.Fatal("DeepSeek_API_KEY environment variable is required")
-	}
 	cfg := config.Load()
+	if len(cfg.AIProviders) == 0 && cfg.Environment != "mock" {
+		log.Fatal("no AI provider configured: set at least one of GROQ_API_KEY, GEMINI_API_KEY, OPENROUTER_API_KEY or DEEPSEEK_API_KEY")
+	}
 	server.Run(cfg)
 }

@@ -65,3 +65,6 @@ test.log
 # K8s local
 kubeconfig
 *.kubeconfig
+
+# Backups
+*.bak
