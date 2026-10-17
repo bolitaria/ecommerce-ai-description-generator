@@ -1,6 +1,9 @@
 {{/*
 Alertmanager configuration with a simple webhook receiver for local dev.
 In production this is replaced with real receivers (Slack, PagerDuty, email).
+
+Includes inhibit_rules to prevent alert storms: when a root-cause alert is
+firing, the symptoms it causes are silenced. One page per incident.
 */}}
 apiVersion: monitoring.coreos.com/v1alpha1
 kind: AlertmanagerConfig
@@ -9,7 +12,6 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "common.labels" . | nindent 4 }}
-    # Matched by the Alertmanager instance from kube-prometheus-stack.
     release: kps
 spec:
   route:
@@ -33,3 +35,70 @@ spec:
       webhookConfigs:
         - url: {{ .Values.alertmanager.webhookURL | default "https://httpbin.org/post" | quote }}
           sendResolved: true
+  inhibitRules:
+    # A crash-looping pod is the root cause. Silence the symptoms it produces
+    # on the same app: HighErrorRate, HighLatencyP95.
+    - sourceMatch:
+        - name: alertname
+          value: PodCrashLooping
+      targetMatch:
+        - name: alertname
+          value: HighErrorRate
+      equal: ['app']
+    - sourceMatch:
+        - name: alertname
+          value: PodCrashLooping
+      targetMatch:
+        - name: alertname
+          value: HighLatencyP95_.*
+          matchType: =~
+      equal: ['app']
+
+    # A Deployment with unavailable replicas is the root cause. Same logic.
+    - sourceMatch:
+        - name: alertname
+          value: KubeDeploymentReplicasMismatch
+      targetMatch:
+        - name: alertname
+          value: HighErrorRate
+      equal: ['app']
+    - sourceMatch:
+        - name: alertname
+          value: KubeDeploymentReplicasMismatch
+      targetMatch:
+        - name: alertname
+          value: HighLatencyP95_.*
+          matchType: =~
+      equal: ['app']
+
+    # If all AI providers are down, the per-provider and fallback alerts are
+    # symptoms. Silence them.
+    - sourceMatch:
+        - name: alertname
+          value: AIProviderTotalOutage
+      targetMatch:
+        - name: alertname
+          value: AIProviderHighErrorRate
+    - sourceMatch:
+        - name: alertname
+          value: AIProviderTotalOutage
+      targetMatch:
+        - name: alertname
+          value: AIProviderFallbackStorm
+
+    # A NodeNotReady silences every workload alert on that node. The node is
+    # the root cause; individual pods are symptoms.
+    - sourceMatch:
+        - name: alertname
+          value: KubeNodeNotReady
+      targetMatch:
+        - name: alertname
+          value: PodCrashLooping
+      equal: ['node']
+    - sourceMatch:
+        - name: alertname
+          value: KubeNodeNotReady
+      targetMatch:
+        - name: alertname
+          value: KubeDeploymentReplicasMismatch
+      equal: ['node']

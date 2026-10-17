@@ -98,3 +98,35 @@ alertmanager:
   # Webhook receiver URL. In local dev, httpbin.org echoes back.
   # In production, override with a real Slack/PagerDuty webhook.
   webhookURL: "https://httpbin.org/post"
+
+# ==============================================================================
+# Alerting thresholds
+# ==============================================================================
+# Tunable thresholds for PrometheusRule alerts. Adjust per environment
+# (values-dev vs values-prod) without touching the rule templates.
+alerts:
+  http:
+    # 5xx error rate above this fraction triggers HighErrorRate.
+    # SRE book recommends 5% for high-traffic services, 1% for critical SLOs.
+    errorRateThreshold: 0.05
+    # p95 latency threshold per service. ai-service talks to LLMs (1-5s),
+    # core-api is DB-backed (<500ms), frontend serves static (<100ms).
+    latencyP95Thresholds:
+      core-api: 0.5
+      ai-service: 5.0
+      frontend: 0.2
+  ai:
+    # Provider error rate above this fraction triggers AIProviderHighErrorRate.
+    providerErrorRateThreshold: 0.10
+    # Fallback rate as a fraction of total requests (not absolute).
+    fallbackRateThreshold: 0.10
+  kubernetes:
+    # Container restarts in 15 minutes before alerting.
+    crashLoopRestartsThreshold: 3
+  # Certificate expiry: warn X days before expiration.
+  certificates:
+    expiryDaysWarning: 14
+    expiryDaysCritical: 7
+  # PVC usage: warn when disk usage exceeds this fraction.
+  pvc:
+    usageThreshold: 0.80

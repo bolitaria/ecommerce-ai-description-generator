@@ -8,14 +8,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
-- `PrometheusRule` with 8 SLO-based alerts across HTTP, AI providers and Kubernetes
-- `AlertmanagerConfig` with webhook receiver (httpbin.org for local validation)
-- `docs/runbook.md`: procedures for every alert, rollback, token rotation,
-  manual scaling and emergency procedures
-- `docs/versioning.md`: three-version strategy (app, chart, image tag) with
-  known issues documented
-- Release workflow (`.github/workflows/release.yml`) triggered on `v*.*.*`
-  tags, builds multi-arch images (amd64 + arm64) and creates a GitHub Release
+- `PrometheusRule` with 14 SLO-based alerts:
+  - HTTP: `HighErrorRate`, `HighLatencyP95_*` (per-service), relative `TrafficDrop`
+  - AI: `AIProviderTotalOutage`, `AIProviderHighErrorRate`, `AIProviderFallbackStorm`
+  - K8s: `KubeDeploymentReplicasMismatch`, `PodCrashLooping`, `HPAAtMaxReplicas`
+  - Infra: `PVCUsageHigh`, `KubeNodeNotReady`, `CertificateExpiringSoon`
+- Configurable thresholds under `alerts.*` in `values.yaml` (error rate,
+  per-service p95 latency, crash loop restarts, PVC usage, cert expiry)
+- `inhibitRules` in `AlertmanagerConfig`: root-cause alerts silence their
+  symptoms (PodCrashLooping → HighErrorRate, AIProviderTotalOutage →
+  AIProviderHighErrorRate, KubeNodeNotReady → workload alerts)
 
 ## [0.2.0] - 2026-10-16
 

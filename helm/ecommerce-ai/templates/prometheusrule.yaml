@@ -1,6 +1,8 @@
 {{/*
 PrometheusRule with SLO-based alerts for the ecommerce-ai platform.
 Discovered by the Prometheus Operator via the `release: kps` label.
+
+Thresholds are configurable in values.yaml under `alerts.*`.
 */}}
 apiVersion: monitoring.coreos.com/v1
 kind: PrometheusRule
@@ -21,7 +23,7 @@ spec:
               sum by (app) (rate(http_requests_total{status=~"5.."}[5m]))
               /
               sum by (app) (rate(http_requests_total[5m]))
-            ) > 0.05
+            ) > {{ .Values.alerts.http.errorRateThreshold }}
           for: 5m
           labels:
             severity: critical
@@ -29,83 +31,136 @@ spec:
           annotations:
             summary: High 5xx error rate on {{`{{ $labels.app }}`}}
             description: |
-              {{`{{ $labels.app }}`}} is returning more than 5% 5xx errors
+              {{`{{ $labels.app }}`}} is returning more than
+              {{ .Values.alerts.http.errorRateThreshold | mul 100 }}% 5xx errors
               for the last 5 minutes (current: {{`{{ $value | humanizePercentage }}`}}).
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#higherrorrate
 
-        - alert: HighLatencyP95
+        {{- range $svc, $threshold := .Values.alerts.http.latencyP95Thresholds }}
+        - alert: HighLatencyP95_{{ $svc }}
           expr: |
             histogram_quantile(
               0.95,
-              sum by (app, le) (rate(http_request_duration_seconds_bucket[5m]))
-            ) > 1
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket{app="{{ $svc }}"}[5m])
+              )
+            ) > {{ $threshold }}
           for: 5m
           labels:
             severity: warning
             team: platform
+            app: {{ $svc }}
           annotations:
-            summary: High p95 latency on {{`{{ $labels.app }}`}}
+            summary: High p95 latency on {{ $svc }}
             description: |
-              p95 latency on {{`{{ $labels.app }}`}} is above 1s
+              p95 latency on {{ $svc }} is above {{ $threshold }}s
               for the last 5 minutes (current: {{`{{ $value | humanizeDuration }}`}}).
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#highlatencyp95
+        {{- end }}
 
         - alert: TrafficDrop
           expr: |
-            sum by (app) (rate(http_requests_total[5m])) == 0
-          for: 10m
+            (
+              sum by (app) (rate(http_requests_total[5m]))
+              < 0.2 * sum by (app) (rate(http_requests_total[5m] offset 1d))
+            )
+            and
+            (sum by (app) (rate(http_requests_total[5m] offset 1d)) > 0)
+          for: 15m
           labels:
             severity: warning
             team: platform
           annotations:
-            summary: No traffic on {{`{{ $labels.app }}`}}
+            summary: Traffic drop on {{`{{ $labels.app }}`}}
             description: |
-              {{`{{ $labels.app }}`}} has received zero requests for 10 minutes.
-              Possible outage upstream (Ingress, Service, NetworkPolicy).
+              {{`{{ $labels.app }}`}} is receiving less than 20% of yesterday's
+              traffic at the same time, for 15 minutes.
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#trafficdrop
 
     - name: ecommerce-ai.ai
       interval: 30s
       rules:
+        - alert: AIProviderTotalOutage
+          expr: |
+            (
+              sum(rate(ai_provider_requests_total{status="success"}[5m]))
+              == 0
+            )
+            and
+            (
+              sum(rate(ai_provider_requests_total[5m])) > 0
+            )
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: All AI providers are failing
+            description: |
+              The AI fallback chain is receiving requests but no provider
+              is returning success. Every user request is failing with 500.
+            runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#aiprovidertotaloutage
+
         - alert: AIProviderHighErrorRate
           expr: |
             (
               sum by (provider) (rate(ai_provider_requests_total{status="error"}[5m]))
               /
               sum by (provider) (rate(ai_provider_requests_total[5m]))
-            ) > 0.10
-          for: 5m
+            ) > {{ .Values.alerts.ai.providerErrorRateThreshold }}
+          for: 15m
           labels:
             severity: warning
             team: platform
           annotations:
             summary: AI provider {{`{{ $labels.provider }}`}} error rate is high
             description: |
-              Provider {{`{{ $labels.provider }}`}} has a failure rate above 10%
-              for the last 5 minutes (current: {{`{{ $value | humanizePercentage }}`}}).
-              The fallback chain is handling it, but the primary is degraded.
+              Provider {{`{{ $labels.provider }}`}} has a failure rate above
+              {{ .Values.alerts.ai.providerErrorRateThreshold | mul 100 }}% for 15 minutes.
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#aiproviderhigherrorrate
 
         - alert: AIProviderFallbackStorm
           expr: |
-            sum by (from, to) (rate(ai_provider_fallbacks_total[5m])) > 1
-          for: 5m
+            (
+              sum by (from, to) (rate(ai_provider_fallbacks_total[5m]))
+              /
+              sum(rate(ai_provider_requests_total[5m]))
+            ) > {{ .Values.alerts.ai.fallbackRateThreshold }}
+          for: 10m
           labels:
             severity: warning
             team: platform
           annotations:
-            summary: Excessive fallbacks from {{`{{ $labels.from }}`}} to {{`{{ $labels.to }}`}}
+            summary: High fallback rate from {{`{{ $labels.from }}`}} to {{`{{ $labels.to }}`}}
             description: |
-              Fallbacks from {{`{{ $labels.from }}`}} to {{`{{ $labels.to }}`}}
-              exceed 1/s for 5 minutes. Check the failing provider.
+              More than {{ .Values.alerts.ai.fallbackRateThreshold | mul 100 }}% of
+              requests are falling back from {{`{{ $labels.from }}`}} to {{`{{ $labels.to }}`}}
+              for 10 minutes.
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#aiproviderfallbackstorm
 
     - name: ecommerce-ai.kubernetes
       interval: 30s
       rules:
+        - alert: KubeDeploymentReplicasMismatch
+          expr: |
+            kube_deployment_spec_replicas{namespace="{{ .Release.Namespace }}"}
+            !=
+            kube_deployment_status_replicas_available{namespace="{{ .Release.Namespace }}"}
+          for: 10m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: Deployment {{`{{ $labels.deployment }}`}} has unavailable replicas
+            description: |
+              Deployment {{`{{ $labels.deployment }}`}} has replicas unavailable
+              for 10 minutes. More reliable than PodNotReady because it does
+              not fire during normal rolling updates.
+            runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#kubedeploymentreplicasmismatch
+
         - alert: PodCrashLooping
           expr: |
-            increase(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}"}[15m]) > 3
+            increase(kube_pod_container_status_restarts_total{namespace="{{ .Release.Namespace }}"}[15m]) > {{ .Values.alerts.kubernetes.crashLoopRestartsThreshold }}
           for: 5m
           labels:
             severity: critical
@@ -113,30 +168,17 @@ spec:
           annotations:
             summary: Pod {{`{{ $labels.pod }}`}} is crash-looping
             description: |
-              Pod {{`{{ $labels.pod }}`}} in namespace {{`{{ $labels.namespace }}`}}
-              has restarted more than 3 times in 15 minutes.
+              Pod {{`{{ $labels.pod }}`}} has restarted more than
+              {{ .Values.alerts.kubernetes.crashLoopRestartsThreshold }}
+              times in 15 minutes.
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#podcrashlooping
-
-        - alert: PodNotReady
-          expr: |
-            kube_pod_status_ready{namespace="{{ .Release.Namespace }}", condition="true"} == 0
-          for: 5m
-          labels:
-            severity: warning
-            team: platform
-          annotations:
-            summary: Pod {{`{{ $labels.pod }}`}} is not ready
-            description: |
-              Pod {{`{{ $labels.pod }}`}} has been not-ready for 5 minutes.
-              Check readiness probe and resource limits.
-            runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#podnotready
 
         - alert: HPAAtMaxReplicas
           expr: |
             kube_horizontalpodautoscaler_status_current_replicas{namespace="{{ .Release.Namespace }}"}
             >=
             kube_horizontalpodautoscaler_spec_max_replicas{namespace="{{ .Release.Namespace }}"}
-          for: 15m
+          for: 30m
           labels:
             severity: warning
             team: platform
@@ -144,5 +186,57 @@ spec:
             summary: HPA {{`{{ $labels.horizontalpodautoscaler }}`}} at max replicas
             description: |
               The HPA for {{`{{ $labels.horizontalpodautoscaler }}`}} has been at
-              max replicas for 15 minutes. Consider raising max or investigating load.
+              max replicas for 30 minutes.
             runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#hpaatmaxreplicas
+
+    - name: ecommerce-ai.infrastructure
+      interval: 30s
+      rules:
+        - alert: PVCUsageHigh
+          expr: |
+            (
+              kubelet_volume_stats_used_bytes{namespace="{{ .Release.Namespace }}"}
+              /
+              kubelet_volume_stats_capacity_bytes{namespace="{{ .Release.Namespace }}"}
+            ) > {{ .Values.alerts.pvc.usageThreshold }}
+          for: 10m
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: PVC {{`{{ $labels.persistentvolumeclaim }}`}} is {{`{{ $value | humanizePercentage }}`}} full
+            description: |
+              PVC {{`{{ $labels.persistentvolumeclaim }}`}} is above
+              {{ .Values.alerts.pvc.usageThreshold | mul 100 }}% capacity for 10 minutes.
+            runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#pvcusagehigh
+
+        - alert: KubeNodeNotReady
+          expr: |
+            kube_node_status_condition{condition="Ready", status="true"} == 0
+          for: 5m
+          labels:
+            severity: critical
+            team: platform
+          annotations:
+            summary: Node {{`{{ $labels.node }}`}} is not ready
+            description: |
+              Node {{`{{ $labels.node }}`}} has been NotReady for 5 minutes.
+            runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#kubenodenotready
+
+        - alert: CertificateExpiringSoon
+          expr: |
+            (
+              certmanager_certificate_expiration_timestamp_seconds
+              -
+              time()
+            ) < {{ .Values.alerts.certificates.expiryDaysWarning }} * 86400
+          for: 1h
+          labels:
+            severity: warning
+            team: platform
+          annotations:
+            summary: Certificate {{`{{ $labels.name }}`}} expires soon
+            description: |
+              Certificate {{`{{ $labels.name }}`}} expires in less than
+              {{ .Values.alerts.certificates.expiryDaysWarning }} days.
+            runbook_url: https://github.com/bolitaria/ecommerce-ai-description-generator/blob/main/docs/runbook.md#certificateexpiringsoon
