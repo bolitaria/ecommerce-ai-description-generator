@@ -62,3 +62,7 @@ postgres:
 
 redis:
   enabled: true
+
+# Alertmanager webhook (dev: httpbin echoes back so we can validate the pipeline).
+alertmanager:
+  webhookURL: "https://httpbin.org/post"
