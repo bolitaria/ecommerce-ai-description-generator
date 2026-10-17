@@ -297,3 +297,86 @@ If you just deployed a new `PrometheusRule` and Prometheus doesn't see it:
 6. **Do NOT force reloads with `kubectl label --overwrite`.** If the Operator isn't reconciling, there's a root cause to investigate (operator down, RBAC, selector misconfigured). Forcing a reload hides the problem.
 
 In production with Argo CD, the Operator reconciles continuously. No intervention is needed.
+
+---
+
+## Additional alerts (alerting-hardening)
+
+These alerts complement the original 8 with infrastructure coverage and
+root-cause-symptom inhibition.
+
+### AIProviderTotalOutage {#aiprovidertotaloutage}
+
+**Severity:** critical
+**Meaning:** The AI fallback chain is receiving requests but all providers
+are failing. Every user-facing `/api/v1/generate` call returns 500.
+
+**Diagnosis:**
+
+```bash
+kubectl logs -n ecommerce-ai deploy/ecommerce-ai-ai-service --tail=200 | grep -i "provider failed"
+Common causes:
+
+All API keys invalid or expired.
+
+Network egress blocked (firewall, DNS).
+
+Provider outages across the board (rare but happens).
+
+Action: check ecommerce-ai-secrets Secret, verify outbound connectivity
+from the pod, check each provider's status page.
+
+---
+
+### KubeDeploymentReplicasMismatch {#kubedeploymentreplicasmismatch}
+
+**Severity:** critical | **Trigger:** Deployment with fewer available replicas than desired for 10m.
+
+**Why this replaces PodNotReady:** PodNotReady fires on rolling updates. This only fires when the Deployment cannot converge.
+
+**Diagnosis:** `kubectl get deploy -n ecommerce-ai && kubectl describe deploy -n ecommerce-ai <deployment>`
+
+**Causes:** ImagePullBackOff, crash loop, insufficient resources, PDB blocking eviction.
+
+---
+
+### PVCUsageHigh {#pvcusagehigh}
+
+**Severity:** warning | **Trigger:** PVC above 80% capacity for 10m.
+
+**Diagnosis:** `kubectl get pvc -n ecommerce-ai && kubectl exec -n ecommerce-ai postgres-0 -- df -h /var/lib/postgresql/data`
+
+**Action:** resize PVC or clean up data.
+
+---
+
+### KubeNodeNotReady {#kubenodenotready}
+
+**Severity:** critical | **Trigger:** node NotReady for 5m.
+
+**Diagnosis:** `kubectl get nodes && kubectl describe node <node> | tail -20`
+
+**Action:** check kubelet logs, disk/memory pressure, network.
+
+---
+
+### CertificateExpiringSoon {#certificateexpiringsoon}
+
+**Severity:** warning | **Trigger:** cert-manager cert expires in <14 days.
+
+**Diagnosis:** `kubectl get certificate -A`
+
+**Action:** verify cert-manager renewal; check ACME challenge. Never disable.
+
+---
+
+## Inhibited alerts
+
+When the root cause fires, symptoms are silenced (one page per incident):
+
+| Root cause | Inhibits |
+|---|---|
+| PodCrashLooping | HighErrorRate, HighLatencyP95_* (same app) |
+| KubeDeploymentReplicasMismatch | HighErrorRate, HighLatencyP95_* (same app) |
+| KubeNodeNotReady | PodCrashLooping, KubeDeploymentReplicasMismatch (same node) |
+| AIProviderTotalOutage | AIProviderHighErrorRate, AIProviderFallbackStorm |
