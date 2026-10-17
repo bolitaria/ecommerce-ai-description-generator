@@ -1,176 +1,299 @@
-# Operational Runbook
+# Runbook — ecommerce-ai platform
 
-## Purpose
+Operational procedures for the ecommerce-ai platform. Every alert defined in
+`helm/ecommerce-ai/templates/prometheusrule.yaml` links to a section here.
 
-This document gathers the recommended steps for developing, testing, validating quality, and deploying the application consistently in local and CI/CD environments.
+---
 
-## Prerequisites
+## Table of contents
 
-- Docker and Docker Compose
-- Go 1.25+
-- Node.js 20+
-- Make
-- Optional: golangci-lint, gosec, govulncheck
+- [When an alert fires](#when-an-alert-fires)
+- [Alerts](#alerts)
+  - [HighErrorRate](#higherrorrate)
+  - [HighLatencyP95](#highlatencyp95)
+  - [TrafficDrop](#trafficdrop)
+  - [AIProviderHighErrorRate](#aiproviderhigherrorrate)
+  - [AIProviderFallbackStorm](#aiproviderfallbackstorm)
+  - [PodCrashLooping](#podcrashlooping)
+  - [PodNotReady](#podnotready)
+  - [HPAAtMaxReplicas](#hpaatmaxreplicas)
+- [Rollback](#rollback)
+- [Rotate the internal API token](#rotate-the-internal-api-token)
+- [Scale a service manually](#scale-a-service-manually)
+- [Emergency procedures](#emergency-procedures)
+- [Known gaps](#known-gaps)
 
-## Quick start for the local environment
+---
 
-### Option 1: Docker Compose
+## When an alert fires {#when-an-alert-fires}
 
-```bash
-docker-compose up --build
-```
+1. **Acknowledge** the alert in Alertmanager / Slack / PagerDuty.
+2. **Open this runbook** at the matching section (link in every alert).
+3. **Check Grafana**: "Ecommerce-AI Platform" dashboard → find the affected service.
+4. **Check recent changes**: `git log --oneline -20 origin/main`. Did a deployment just happen? If yes, consider rollback first.
+5. **If impact is severe**, roll back first and investigate after. A rollback is cheap; a prolonged outage is not.
 
-### Option 2: Makefile
+---
 
-```bash
-make docker-build
-make docker-run
-```
+## Alerts
 
-### Expected services
+### HighErrorRate {#higherrorrate}
 
-- Frontend: http://localhost:5173
-- Backend API: http://localhost:8080
-- Health check: http://localhost:8080/health
+**Severity:** critical
+**Meaning:** More than 5% of HTTP responses are 5xx for 5 minutes on a service.
 
-### Stop the environment
-
-```bash
-make docker-stop
-```
-
-## Testing scripts and commands
-
-### Backend (Go)
-
-Run the full test suite:
-
-```bash
-go test ./...
-```
-
-Run with the race detector and generate coverage:
+**Diagnosis:**
 
 ```bash
-go test -v -race -coverprofile=coverage.out ./...
+kubectl logs -n ecommerce-ai -l app.kubernetes.io/name=<service> --tail=200 | grep -i error
+kubectl get pods -n ecommerce-ai -l app.kubernetes.io/name=<service>
 ```
 
-Run integration tests if PostgreSQL is available:
+**Common causes:**
+
+- Recent deployment with a bug → rollback (see [Rollback](#rollback)).
+- Database unreachable → check `pod/postgres-0` and `DATABASE_URL` in the Secret.
+- Downstream service down (core-api → ai-service) → check the target service.
+
+---
+
+### HighLatencyP95 {#highlatencyp95}
+
+**Severity:** warning
+**Meaning:** p95 latency above 1s for 5 minutes on a service.
+
+**Diagnosis:**
+
+1. Grafana → "HTTP latency p95" panel → identify the affected route.
+2. If `ai-service`: check `ai_provider_request_duration_seconds` per provider. A slow provider may be causing the delay.
+3. Check `kubectl top pod -n ecommerce-ai` for CPU throttling.
+
+**Common causes:**
+
+- LLM provider slow → check `ai_provider_fallbacks_total`. If the fallback is not kicking in, the primary is degraded.
+- Postgres slow query → check `pg_stat_activity`.
+- CPU throttling → raise `resources.limits.cpu` in the affected service.
+
+---
+
+### TrafficDrop {#trafficdrop}
+
+**Severity:** warning
+**Meaning:** A service receives zero requests for 10 minutes.
+
+**Diagnosis:**
 
 ```bash
-export TEST_DATABASE_URL=postgres://test:test@localhost:5432/testdb?sslmode=disable
-go test -v ./tests/integration/...
+kubectl get endpoints -n ecommerce-ai <service>
+kubectl describe ingress -n ecommerce-ai ecommerce-ai
 ```
 
-### Frontend (React + TypeScript)
+**Common causes:**
+
+- Ingress misconfigured → check `kubectl describe ingress`.
+- NetworkPolicy blocking → check `kubectl describe networkpolicy -n ecommerce-ai`.
+- Service selector mismatch → pods not selected by the Service.
+
+---
+
+### AIProviderHighErrorRate {#aiproviderhigherrorrate}
+
+**Severity:** warning
+**Meaning:** A single AI provider is failing more than 10% of requests for 5 minutes.
+
+**Diagnosis:**
 
 ```bash
-cd web
-npm ci
-npm run lint
-npm run build
+kubectl logs -n ecommerce-ai deployment/ecommerce-ai-ai-service --tail=200 | grep -i "provider failed"
 ```
 
-### Makefile commands
+**Common causes:**
+
+- Provider API key invalid or expired → check `ecommerce-ai-secrets` Secret.
+- Provider rate-limited (HTTP 429) → the fallback handles it, but the primary is degraded.
+- Provider outage → check the provider status page.
+
+**Action:** the fallback chain handles this transparently. Investigate only if it persists > 30 minutes.
+
+---
+
+### AIProviderFallbackStorm {#aiproviderfallbackstorm}
+
+**Severity:** warning
+**Meaning:** Fallbacks happen more than once per second for 5 minutes.
+
+**Diagnosis:**
 
 ```bash
-make test
-make lint
-make build
+kubectl logs -n ecommerce-ai deployment/ecommerce-ai-ai-service --tail=500 | grep "AI provider failed"
 ```
 
-## Code quality and review
+**Common causes:** same as [AIProviderHighErrorRate](#aiproviderhigherrorrate) but sustained.
 
-### Go lint
+**Action:** if the primary provider is degraded for a long period, disable it temporarily by emptying its API key in `values-dev.yaml` / `values-prod.yaml`.
+
+---
+
+### PodCrashLooping {#podcrashlooping}
+
+**Severity:** critical
+**Meaning:** A pod has restarted more than 3 times in 15 minutes.
+
+**Diagnosis:**
 
 ```bash
-make lint
+kubectl describe pod -n ecommerce-ai <pod> | tail -30
+kubectl logs -n ecommerce-ai <pod> --previous --tail=100
 ```
 
-### Additional recommended checks
+**Common causes:**
+
+- Config error (bad `DATABASE_URL`, missing secret).
+- Migration failure (core-api runs migrations on startup).
+- OOMKilled → check `kubectl describe pod` for `OOMKilled` and raise memory limit.
+
+**If it's a startup dependency:** e.g. core-api fails because postgres isn't ready yet → `kubectl rollout restart deployment/ecommerce-ai-core-api` once postgres is up.
+
+---
+
+### PodNotReady {#podnotready}
+
+**Severity:** warning
+**Meaning:** A pod has been not-ready for 5 minutes (readiness probe failing).
+
+**Diagnosis:**
 
 ```bash
-gosec ./...
-govulncheck ./...
-cd web && npm audit
+kubectl describe pod -n ecommerce-ai <pod> | grep -A5 "Readiness"
 ```
 
-## CI/CD
+**Common causes:**
 
-The project uses GitHub Actions to validate changes and publish images.
+- Readiness endpoint returns 5xx (application not initialized).
+- Probe path/timing wrong → check the `readinessProbe` in the chart values.
+- Network issue between kubelet and pod.
 
-### Available workflows
+---
 
-- .github/workflows/ci.yml: main continuous integration and deployment pipeline
-- .github/workflows/.golangci.yml: Go lint configuration
+### HPAAtMaxReplicas {#hpaatmaxreplicas}
 
-### What the pipeline runs
+**Severity:** warning
+**Meaning:** The HPA has been at max replicas for 15 minutes.
 
-1. Backend test
-   - Installs Go
-   - Starts PostgreSQL as a test service
-   - Runs lint and tests
-
-2. Frontend test
-   - Installs Node.js
-   - Runs npm ci, lint, and build
-
-3. Build and push
-   - Builds Docker images and publishes them to GitHub Container Registry
-
-4. Deploy
-   - Runs on main and deploys to Cloud Run when the required secrets are configured
-
-### Expected secrets
-
-The following variables are required:
-
-- GCP_SA_KEY
-- CLOUD_RUN_SERVICE
-- GCP_REGION
-- DATABASE_URL
-- DeepSeek_API_KEY
-- JWT_SECRET
-
-## Deployment
-
-### Local deployment with Docker Compose
+**Diagnosis:**
 
 ```bash
-docker-compose -f deploy/docker-compose.prod.yml up -d
+kubectl get hpa -n ecommerce-ai
+kubectl describe hpa -n ecommerce-ai ecommerce-ai-ai-service
 ```
 
-### Deployment with Terraform
+**Action:**
+
+- If sustained, raise `autoscaling.maxReplicas` in `values-prod.yaml`.
+- Or investigate why the load is so high (traffic spike, bug, infinite loop).
+
+---
+
+## Rollback {#rollback}
+
+**Preferred (GitOps):**
 
 ```bash
-cd deploy/terraform
-terraform init
-terraform apply
+git revert <bad-commit-sha>
+git push origin main
+# Argo CD reconciles back to the previous state automatically.
 ```
 
-## Troubleshooting
+**Emergency (Helm):**
 
-### Docker Compose fails to start
+```bash
+helm history ecommerce-ai -n ecommerce-ai
+helm rollback ecommerce-ai <previous-revision> -n ecommerce-ai
+```
 
-- Verify that Docker is running
-- Confirm that ports 5173, 8080, and 5432 are free
-- Review the .env file
+**Single service (kubectl):**
 
-### Database connection issues
+```bash
+kubectl rollout undo deployment/ecommerce-ai-core-api -n ecommerce-ai
+```
 
-- Verify that PostgreSQL is available
-- Confirm that DATABASE_URL or TEST_DATABASE_URL is correct
-- Review the logs of the database container
+---
 
-### CI failures
+## Rotate the internal API token {#rotate-the-internal-api-token}
 
-- Re-run the same commands locally
-- Review the GitHub Actions workflow logs
-- Validate that the secrets are configured correctly
+```bash
+# 1. Generate a new token
+NEW_TOKEN=$(openssl rand -hex 32)
 
-## Recommended daily workflow
+# 2. Update the Secret (Reloader triggers a rolling restart)
+kubectl create secret generic ecommerce-ai-secrets \
+  --from-literal=INTERNAL_API_TOKEN="$NEW_TOKEN" \
+  --dry-run=client -o yaml | kubectl apply -f - -n ecommerce-ai
 
-1. Run local tests before opening a PR
-2. Review frontend lint and build
-3. Confirm that the application starts correctly with Docker
-4. Push changes and verify the pipeline in GitHub Actions
+# 3. Verify pods restarted
+kubectl rollout status deployment/ecommerce-ai-ai-service -n ecommerce-ai
+kubectl rollout status deployment/ecommerce-ai-core-api -n ecommerce-ai
+```
+
+---
+
+## Scale a service manually {#scale-a-service-manually}
+
+```bash
+# If HPA is enabled, manual scaling will be reverted. Disable HPA first:
+kubectl patch hpa ecommerce-ai-ai-service -n ecommerce-ai \
+  --type=json -p='[{"op":"remove","path":"/spec/metrics"}]'
+
+# Then scale
+kubectl scale deployment ecommerce-ai-ai-service -n ecommerce-ai --replicas=5
+```
+
+---
+
+## Emergency procedures {#emergency-procedures}
+
+### Full platform outage
+
+1. Confirm: `curl -f https://<your-domain>/health` → fails?
+2. Check cluster: `kubectl get nodes`, `kubectl get pods -A`.
+3. If cluster is up but app is down → [Rollback](#rollback).
+4. If cluster is down → escalate to infra / cloud provider.
+5. Communicate: status page update, incident channel.
+
+### Database is down
+
+Postgres runs as a StatefulSet in dev (`postgres-0`). In production, use a managed database.
+
+```bash
+kubectl get pod -n ecommerce-ai postgres-0
+kubectl logs -n ecommerce-ai postgres-0 --tail=100
+
+# If it's transient, restarting usually works
+kubectl delete pod -n ecommerce-ai postgres-0
+
+# If persistent, check the PVC
+kubectl get pvc -n ecommerce-ai
+```
+
+---
+
+## Known gaps {#known-gaps}
+
+- **No backups yet.** If the Postgres PVC is lost, all data is lost. See the "Backups" phase in the roadmap.
+- **No real Alertmanager receiver.** Currently points to `httpbin.org` for validation. In production, replace with Slack/PagerDuty/email.
+- **No multi-region DR.** The platform runs in a single cluster.
+---
+
+## Alerts not appearing in Prometheus
+
+If you just deployed a new `PrometheusRule` and Prometheus doesn't see it:
+
+1. **Wait 30 seconds.** The Prometheus Operator reconciles asynchronously.
+2. Check the rule exists: `kubectl get prometheusrule -n ecommerce-ai`
+3. Check the selector: `kubectl get prometheus -n monitoring kps-kube-prometheus-stack-prometheus -o jsonpath='{.spec.ruleSelector}'` should return `{}`.
+4. Run the verification script: `./scripts/verify-alerts.sh 8`
+5. If it times out after 2 minutes, check the Operator logs:
+   `kubectl logs -n monitoring deploy/kps-kube-prometheus-stack-operator --tail=50`
+6. **Do NOT force reloads with `kubectl label --overwrite`.** If the Operator isn't reconciling, there's a root cause to investigate (operator down, RBAC, selector misconfigured). Forcing a reload hides the problem.
+
+In production with Argo CD, the Operator reconciles continuously. No intervention is needed.

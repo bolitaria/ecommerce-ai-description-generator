@@ -1,0 +1,35 @@
+{{/*
+Alertmanager configuration with a simple webhook receiver for local dev.
+In production this is replaced with real receivers (Slack, PagerDuty, email).
+*/}}
+apiVersion: monitoring.coreos.com/v1alpha1
+kind: AlertmanagerConfig
+metadata:
+  name: {{ .Release.Name }}-receivers
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "common.labels" . | nindent 4 }}
+    # Matched by the Alertmanager instance from kube-prometheus-stack.
+    release: kps
+spec:
+  route:
+    receiver: default
+    groupBy: ['alertname', 'app']
+    groupWait: 30s
+    groupInterval: 5m
+    repeatInterval: 4h
+    routes:
+      - matchers:
+          - name: severity
+            value: critical
+        receiver: critical
+        repeatInterval: 1h
+  receivers:
+    - name: default
+      webhookConfigs:
+        - url: {{ .Values.alertmanager.webhookURL | default "https://httpbin.org/post" | quote }}
+          sendResolved: true
+    - name: critical
+      webhookConfigs:
+        - url: {{ .Values.alertmanager.webhookURL | default "https://httpbin.org/post" | quote }}
+          sendResolved: true

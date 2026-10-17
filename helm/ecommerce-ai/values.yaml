@@ -90,3 +90,11 @@ ai-service:
 
 frontend:
   enabled: true
+
+# ==============================================================================
+# Alerting
+# ==============================================================================
+alertmanager:
+  # Webhook receiver URL. In local dev, httpbin.org echoes back.
+  # In production, override with a real Slack/PagerDuty webhook.
+  webhookURL: "https://httpbin.org/post"
