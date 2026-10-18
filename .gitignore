@@ -57,12 +57,6 @@ test.log
 .env
 .env.local
 
-# Terraform
-.terraform/
-*.tfstate
-*.tfstate.backup
-.terraform.lock.hcl
-
 # K8s local
 kubeconfig
 *.kubeconfig
@@ -82,3 +76,15 @@ helm/**/Chart.lock
 helm/**/charts/*.tgz
 helm/**/charts/**/charts/*.tgz
 helm/**/Chart.lock
+
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.*
+terraform.tfvars
+*.auto.tfvars
+.terraform.tfstate.lock.info
+# NOTE: .terraform.lock.hcl is NOT ignored (HashiCorp recommends
+# committing it in applications for reproducible provider versions).
