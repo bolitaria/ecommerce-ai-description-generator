@@ -88,3 +88,9 @@ terraform.tfvars
 .terraform.tfstate.lock.info
 # NOTE: .terraform.lock.hcl is NOT ignored (HashiCorp recommends
 # committing it in applications for reproducible provider versions).
+
+# Ansible
+infra/ansible/inventory.yml
+
+# Ansible collections (installed via requirements.yml -p ./collections)
+infra/ansible/collections/
