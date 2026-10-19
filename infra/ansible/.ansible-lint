@@ -1,0 +1,7 @@
+---
+# ansible-lint configuration
+exclude_paths:
+  - collections/
+  - .cache/
+
+offline: true

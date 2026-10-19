@@ -1,0 +1,61 @@
+---
+# Common base configuration: update, packages, timezone, swap off.
+
+- name: Detect if running in a container
+  ansible.builtin.set_fact:
+    common_is_container: "{{ ansible_virtualization_type in ['docker', 'container', 'containerd', 'kubernetes'] }}"
+
+- name: Update apt cache
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Install base packages
+  ansible.builtin.apt:
+    name: "{{ common_base_packages }}"
+    state: present
+
+- name: Set timezone
+  community.general.timezone:
+    name: "{{ common_timezone }}"
+
+- name: Check if swap is enabled
+  ansible.builtin.command: swapon --show
+  register: common_swap_status
+  changed_when: false
+  when: common_disable_swap
+
+- name: Disable swap now
+  ansible.builtin.command: swapoff -a
+  when:
+    - common_disable_swap
+    - common_swap_status.stdout | length > 0
+    - not common_is_container
+  changed_when: true
+
+- name: Disable swap on boot (comment out swap entries in /etc/fstab)
+  ansible.builtin.replace:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    replace: '# \1'
+  when:
+    - common_disable_swap
+    - not common_is_container
+
+- name: Load br_netfilter and overlay kernel modules
+  community.general.modprobe:
+    name: "{{ item }}"
+    state: present
+  loop:
+    - br_netfilter
+    - overlay
+  tags: [kernel]
+
+- name: Persist kernel modules across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k3s.conf
+    content: |
+      br_netfilter
+      overlay
+    mode: '0644'
+  tags: [kernel]

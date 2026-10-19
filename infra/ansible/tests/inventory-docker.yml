@@ -1,0 +1,11 @@
+---
+# Test inventory: run against a Docker container instead of a real VM.
+# Requires: docker run -d --name ansible-test ubuntu:22.04 sleep infinity
+
+all:
+  hosts:
+    ansible-test:
+      ansible_connection: docker
+      ansible_host: ansible-test
+      ansible_user: root
+      ansible_python_interpreter: /usr/bin/python3

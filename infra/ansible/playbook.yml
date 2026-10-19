@@ -1,0 +1,22 @@
+---
+# Main playbook for the Oracle Cloud ARM instance.
+#
+# Usage:
+#   cp inventory.yml.example inventory.yml
+#   # edit inventory.yml with the VM's public IP
+#   ansible-playbook -i inventory.yml playbook.yml
+#
+# Roles run in order:
+#   1. common    - base packages, timezone, swap off
+#   2. hardening - ufw firewall, fail2ban, ssh key-only
+#   3. k3s       - install k3s (lightweight Kubernetes)
+
+- name: Configure ecommerce-ai ARM instance
+  hosts: oracle-vm
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - hardening
+    - k3s
