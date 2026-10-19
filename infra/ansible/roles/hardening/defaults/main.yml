@@ -1,0 +1,17 @@
+---
+# Default variables for the hardening role.
+
+# Ports allowed by ufw.
+hardening_ufw_allowed_ports:
+  - { port: 22, proto: tcp, comment: "SSH" }
+  - { port: 80, proto: tcp, comment: "HTTP" }
+  - { port: 443, proto: tcp, comment: "HTTPS" }
+
+# SSH: disable password auth (key-only).
+hardening_ssh_permit_root_login: "no"
+hardening_ssh_password_authentication: "no"
+
+# fail2ban: ban after N failed attempts for M minutes.
+hardening_fail2ban_maxretry: 5
+hardening_fail2ban_bantime: 3600
+hardening_fail2ban_findtime: 600

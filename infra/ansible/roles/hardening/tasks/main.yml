@@ -1,0 +1,76 @@
+---
+# Hardening: ufw firewall, SSH key-only, fail2ban.
+# Container-aware: services requiring systemd/kernel are skipped in Docker.
+
+- name: Detect if running in a container
+  ansible.builtin.set_fact:
+    hardening_is_container: "{{ ansible_virtualization_type in ['docker', 'container', 'containerd', 'kubernetes'] }}"
+
+# --- UFW firewall ---
+- name: Ensure ufw is installed
+  ansible.builtin.apt:
+    name: ufw
+    state: present
+
+- name: Reset ufw to a known state (idempotent base)
+  ansible.builtin.command: ufw --force reset
+  changed_when: false
+
+- name: Set default deny incoming
+  ansible.builtin.command: ufw default deny incoming
+  changed_when: false
+
+- name: Set default allow outgoing
+  ansible.builtin.command: ufw default allow outgoing
+  changed_when: false
+
+- name: Allow ports
+  ansible.builtin.command: "ufw allow {{ item.port }}/{{ item.proto }} comment '{{ item.comment }}'"
+  loop: "{{ hardening_ufw_allowed_ports }}"
+  changed_when: false
+
+- name: Enable ufw
+  ansible.builtin.command: ufw --force enable
+  changed_when: false
+
+# --- SSH hardening (key-only, no root login) ---
+# Skipped in container: sshd_config may not exist.
+- name: Disable SSH password authentication
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PasswordAuthentication\s+.*'
+    line: "PasswordAuthentication {{ hardening_ssh_password_authentication }}"
+    state: present
+  when: not hardening_is_container
+  notify: Restart sshd
+
+- name: Disable SSH root login
+  ansible.builtin.lineinfile:
+    path: /etc/ssh/sshd_config
+    regexp: '^#?PermitRootLogin\s+.*'
+    line: "PermitRootLogin {{ hardening_ssh_permit_root_login }}"
+    state: present
+  when: not hardening_is_container
+  notify: Restart sshd
+
+# --- fail2ban ---
+- name: Configure fail2ban jail for SSH
+  ansible.builtin.copy:
+    dest: /etc/fail2ban/jail.local
+    mode: '0644'
+    content: |
+      [DEFAULT]
+      maxretry = {{ hardening_fail2ban_maxretry }}
+      bantime  = {{ hardening_fail2ban_bantime }}
+      findtime = {{ hardening_fail2ban_findtime }}
+
+      [sshd]
+      enabled = true
+  when: not hardening_is_container
+
+- name: Ensure fail2ban is running
+  ansible.builtin.systemd:
+    name: fail2ban
+    state: started
+    enabled: true
+  when: not hardening_is_container

@@ -1,0 +1,19 @@
+---
+# Test playbook: common + hardening (against Docker container).
+#
+# Usage:
+#   docker run -d --name ansible-test --cap-add=NET_ADMIN \
+#     --platform linux/amd64 ubuntu:22.04 sleep infinity
+#   docker exec ansible-test apt update -qq && \
+#     docker exec ansible-test apt install -y -qq python3
+#   ansible-playbook -i tests/inventory-docker.yml tests/test-hardening.yml \
+#     --skip-tags kernel
+
+- name: Test common + hardening roles
+  hosts: ansible-test
+  become: true
+  gather_facts: true
+
+  roles:
+    - common
+    - hardening
