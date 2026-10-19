@@ -9,7 +9,7 @@
 # Roles run in order:
 #   1. common    - base packages, timezone, swap off
 #   2. hardening - ufw firewall, fail2ban, ssh key-only
-#   3. k3s       - install k3s (lightweight Kubernetes)
+#   3. k3s       - pending (requires Oracle ARM host with systemd + kernel)
 
 - name: Configure ecommerce-ai ARM instance
   hosts: oracle-vm
@@ -19,4 +19,6 @@
   roles:
     - common
     - hardening
-    - k3s
+    # k3s: pending. Requires a real host with systemd + kernel (Oracle ARM).
+    # The role directory and reference are removed until the role is implemented.
+    # Planned follow-up once the Oracle ARM instance is provisioned.
