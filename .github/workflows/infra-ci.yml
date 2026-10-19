@@ -1,0 +1,82 @@
+name: Infra CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+  pull-requests: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  ansible-lint:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            ansible:
+              - 'infra/ansible/**'
+      - uses: actions/setup-python@v5
+        if: steps.filter.outputs.ansible == 'true'
+        with:
+          python-version: '3.12'
+      - name: Install ansible-lint and collections
+        if: steps.filter.outputs.ansible == 'true'
+        working-directory: infra/ansible
+        run: |
+          pip install 'ansible-lint==26.10.1'
+          ansible-galaxy collection install -r requirements.yml -p ./collections
+      - name: Run ansible-lint (production profile)
+        if: steps.filter.outputs.ansible == 'true'
+        working-directory: infra/ansible
+        run: ansible-lint
+
+  terraform-check:
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: infra/terraform
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            terraform:
+              - 'infra/terraform/**'
+      - uses: hashicorp/setup-terraform@v3
+        if: steps.filter.outputs.terraform == 'true'
+        with:
+          terraform_version: '1.9.8'
+      - name: terraform fmt -check
+        if: steps.filter.outputs.terraform == 'true'
+        run: terraform fmt -check -recursive
+      - name: terraform init (no backend)
+        if: steps.filter.outputs.terraform == 'true'
+        run: terraform init -backend=false -input=false
+      - name: terraform validate
+        if: steps.filter.outputs.terraform == 'true'
+        run: terraform validate
+
+  secret-scan:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
