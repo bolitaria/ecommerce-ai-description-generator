@@ -7,10 +7,12 @@
     hardening_is_container: "{{ ansible_virtualization_type in ['docker', 'container', 'containerd', 'kubernetes'] }}"
 
 # --- UFW firewall ---
-- name: Ensure ufw is installed
+- name: Install hardening base packages
   ansible.builtin.apt:
-    name: ufw
+    name: "{{ hardening_base_packages }}"
     state: present
+    update_cache: true
+    cache_valid_time: 3600
 
 - name: Reset ufw to a known state (idempotent base)
   ansible.builtin.command: ufw --force reset
