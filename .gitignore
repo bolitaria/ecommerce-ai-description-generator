@@ -94,3 +94,7 @@ infra/ansible/inventory.yml
 
 # Ansible collections (installed via requirements.yml -p ./collections)
 infra/ansible/collections/
+
+# Python
+__pycache__/
+*.pyc
