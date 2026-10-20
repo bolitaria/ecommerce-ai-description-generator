@@ -98,3 +98,6 @@ infra/ansible/collections/
 # Python
 __pycache__/
 *.pyc
+
+# ── Sample data (not committed) ─────────────
+productos_ejemplo.xlsx
