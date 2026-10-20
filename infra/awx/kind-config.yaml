@@ -1,0 +1,10 @@
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+name: awx
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      # AWX NodePort (service_type=nodeport, nodeport_port=30080 in awx.yaml)
+      - containerPort: 30080
+        hostPort: 30080
+        protocol: TCP
