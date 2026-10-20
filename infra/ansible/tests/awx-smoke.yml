@@ -1,0 +1,15 @@
+---
+# Smoke test for AWX. Runs against any host (including localhost).
+# Verifies: git pull, playbook parse, host match, execution, output.
+# Safe: no privileged tasks, no changes to the host.
+- name: AWX smoke test
+  hosts: all
+  gather_facts: true
+  tasks:
+    - name: Report target
+      ansible.builtin.debug:
+        msg:
+          - "host: {{ inventory_hostname }}"
+          - "os: {{ ansible_distribution }} {{ ansible_distribution_version }}"
+          - "ansible: {{ ansible_version.full }}"
+          - "job_id: {{ tower_job_id | default('n/a') }}"
