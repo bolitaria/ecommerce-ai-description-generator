@@ -16,8 +16,6 @@ common_base_packages:
   - htop
   - jq
   - unzip
-  - ufw
-  - fail2ban
 
 # Disable swap (required by k3s / Kubernetes).
 common_disable_swap: true

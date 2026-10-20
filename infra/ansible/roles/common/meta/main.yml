@@ -1,0 +1,18 @@
+---
+galaxy_info:
+  role_name: common
+  author: Marina Montañez
+  description: Common base configuration for Ubuntu 22.04+ (packages, timezone, swap off)
+  license: MIT
+  min_ansible_version: "2.15"
+  platforms:
+    - name: Ubuntu
+      versions:
+        - jammy
+        - noble
+  galaxy_tags:
+    - base
+    - system
+    - bootstrap
+
+dependencies: []

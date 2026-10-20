@@ -1,6 +1,13 @@
 ---
 # Default variables for the hardening role.
 
+# Base packages for this role. Kept here (not in common) so this role
+# is self-contained: using common alone must not install a firewall
+# that nobody configures.
+hardening_base_packages:
+  - ufw
+  - fail2ban
+
 # Ports allowed by ufw.
 hardening_ufw_allowed_ports:
   - { port: 22, proto: tcp, comment: "SSH" }
